@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact | Envision E-Cell</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="nav-wrap">
+      <div class="logo logo-pair">
+        <a href="index.html" class="logo-mark logo-brand" aria-label="Envision Home">
+          <img src="envision-logo-transparent.png" alt="Envision E-Cell" />
+        </a>
+        <a href="https://iimbg.ac.in/" class="logo-mark logo-institute-link" target="_blank" rel="noopener noreferrer"
+          aria-label="Visit IIM Bodh Gaya website, opens in a new tab">
+          <img src="iimbg-crest-transparent.png" alt="IIM Bodh Gaya" />
+        </a>
+        <a href="index.html" class="logo-text logo-title-link" aria-label="Envision Home">
+          <h1>ENVISION</h1><span>E-Cell IIM Bodh Gaya</span>
+        </a>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="about.html">About</a>
+        <a href="events.html">Events</a>
+        <a href="incubation.html">Incubation</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+      <a href="contact.html" class="nav-cta">Connect With Us</a>
+      <button class="menu-toggle" aria-label="Toggle navigation"><i class="fa-solid fa-bars"></i></button>
+    </div>
+    <div class="mobile-menu">
+      <div class="mobile-menu-inner">
+        <a href="index.html">Home</a>
+        <a href="about.html">About</a>
+        <a href="events.html">Events</a>
+        <a href="incubation.html">Incubation</a>
+        <a href="contact.html">Contact</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="page-hero-inner reveal">
+      <div class="section-label">Contact</div>
+      <h1>Let’s build the next chapter <span class="gradient-text">together.</span></h1>
+      <p>Reach out for partnerships, incubation opportunities, student engagement, or event collaborations.</p>
+    </div>
+  </section>
+
+  <main>
+    <section class="section">
+      <div class="container contact-grid">
+        <div class="contact-panel reveal">
+          <div class="section-label">Reach Out</div>
+          <h2>Connect with us.</h2>
+          <div class="contact-list">
+            <div class="contact-item">
+              <i class="fa-solid fa-location-dot"></i>
+              <span>IIM Bodh Gaya Campus, Uruvela, Prabandh Vihar, Bodh Gaya, Bihar 824234</span>
+            </div>
+            <div class="contact-item">
+              <i class="fa-solid fa-envelope"></i>
+              <span><a href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></span>
+            </div>
+            <div class="contact-item">
+              <i class="fa-solid fa-phone"></i>
+              <span>+91 (0) 631 220 0238</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-panel reveal">
+          <div class="section-label">Get In Touch</div>
+          <form id="contact-form" data-mailto="envision@iimbg.ac.in">
+            <div class="form-row">
+              <input type="text" name="name" autocomplete="name" placeholder="Your Name" required />
+              <input type="email" name="email" autocomplete="email" placeholder="Email Address" required />
+            </div>
+            <input type="text" name="subject" placeholder="Subject" required />
+            <textarea name="message" placeholder="Tell us about your interest..." required></textarea>
+            <button type="submit" class="btn btn-primary">Send Message</button>
+            <p class="contact-form-status" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <video class="signature-clip" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+            <source src="ECell%20Sign%20mail%202026%20(2).mp4" type="video/mp4" />
+          </video>
+        </div>
+        <div>
+          <h3
+            style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">
+            Explore</h3>
+          <ul class="footer-links">
+            <li><a href="about.html">About</a></li>
+            <li><a href="events.html">Events</a></li>
+            <li><a href="incubation.html">Incubation</a></li>
+            <li><a href="index.html#faq">FAQs</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3
+            style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">
+            Reach Out</h3>
+          <ul class="footer-links">
+            <li><a href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></li>
+            <li><a href="tel:+916312200238">+91 (0) 631 220 0238</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-meta">
+        <span>© <span id="year"></span> ENVISION E-CELL IIM BODH GAYA</span>
+        <span><a href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer" aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a href="https://iimbg.ac.in/terms-conditions/" target="_blank" rel="noopener noreferrer" aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> • <a href="https://iimbg.ac.in/copyright-policy/" target="_blank" rel="noopener noreferrer" aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a href="https://iimbg.ac.in/disclaimer/" target="_blank" rel="noopener noreferrer" aria-label="Disclaimer, opens in a new tab">Disclaimer</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="supabase-config.js"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Disallow error pages from indexing
+Disallow: /404.html
+Disallow: /500.html
+Disallow: /403.html
+
+# Sitemap Location
+Sitemap: https://envision-iimbg.ac.in/sitemap.xml
