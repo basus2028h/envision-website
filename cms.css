@@ -1247,7 +1247,7 @@ body.cms-edit-mode .wp-card-media-pill {
 /* Universal Move Handle Pill for Content Blocks, Boxes & Elements */
 .cms-element-move-pill {
   position: absolute;
-  top: -12px;
+  top: -14px;
   left: 6px;
   z-index: 999;
   display: none;
@@ -1256,12 +1256,13 @@ body.cms-edit-mode .wp-card-media-pill {
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 9999px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2);
-  padding: 1px 4px;
+  padding: 2px 4px;
   gap: 2px;
   user-select: none;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   animation: wpFadeIn 0.12s ease;
   pointer-events: auto;
+  line-height: 1;
 }
 
 body.cms-edit-mode [data-cms-editable]:hover > .cms-element-move-pill,
@@ -1272,6 +1273,14 @@ body.cms-edit-mode [data-cms-relocatable].cms-move-active > .cms-element-move-pi
 body.cms-relocate-mode [data-cms-editable] > .cms-element-move-pill,
 body.cms-relocate-mode [data-cms-relocatable] > .cms-element-move-pill {
   display: inline-flex !important;
+}
+
+/* Ensure Topbar, navigation, and logos are pristine and never show move pills or layout shift */
+.topbar .cms-element-move-pill,
+.topbar [data-cms-editable] > .cms-element-move-pill,
+.nav-links .cms-element-move-pill,
+.logo .cms-element-move-pill {
+  display: none !important;
 }
 
 /* Ensure no edit controls or popovers are clipped by card/section overflow */
@@ -1287,27 +1296,36 @@ body.cms-edit-mode [data-cms-card] {
   overflow: visible !important;
 }
 
-body.cms-edit-mode [data-cms-editable],
-body.cms-edit-mode [data-cms-relocatable] {
+body.cms-edit-mode [data-cms-editable]:not(.topbar *),
+body.cms-edit-mode [data-cms-relocatable]:not(.topbar *) {
   position: relative !important;
   transition: outline 0.15s ease;
 }
 
-body.cms-edit-mode span[data-cms-editable],
-body.cms-edit-mode a[data-cms-editable],
+body.cms-edit-mode span[data-cms-editable]:not(.logo-text span),
+body.cms-edit-mode a[data-cms-editable]:not(.nav-links a):not(.logo a),
 body.cms-edit-mode .badge[data-cms-editable],
 body.cms-edit-mode .section-label[data-cms-editable] {
   display: inline-block;
 }
 
-body.cms-edit-mode [data-cms-relocatable]:hover,
-body.cms-edit-mode [data-cms-editable]:hover {
+body.cms-edit-mode h1[data-cms-editable]:not(.logo-text h1),
+body.cms-edit-mode h2[data-cms-editable],
+body.cms-edit-mode h3[data-cms-editable],
+body.cms-edit-mode h4[data-cms-editable],
+body.cms-edit-mode h5[data-cms-editable],
+body.cms-edit-mode h6[data-cms-editable] {
+  display: block;
+}
+
+body.cms-edit-mode [data-cms-relocatable]:not(.topbar *):hover,
+body.cms-edit-mode [data-cms-editable]:not(.topbar *):hover {
   outline: 1.5px dashed rgba(59, 130, 246, 0.75) !important;
   outline-offset: 3px;
 }
 
-body.cms-relocate-mode [data-cms-relocatable],
-body.cms-relocate-mode [data-cms-editable] {
+body.cms-relocate-mode [data-cms-relocatable]:not(.topbar *),
+body.cms-relocate-mode [data-cms-editable]:not(.topbar *) {
   outline: 1.5px dashed rgba(245, 158, 11, 0.75) !important;
   outline-offset: 3px;
 }
@@ -1316,12 +1334,11 @@ body.cms-relocate-mode [data-cms-editable] {
   background: transparent;
   border: 0;
   color: #f8fafc;
-  padding: 3px 8px;
+  padding: 3px 6px;
   font-size: 11px;
-  font-weight: 700;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
   cursor: grab !important;
   border-radius: 9999px;
   transition: all 0.15s ease;
@@ -1329,6 +1346,7 @@ body.cms-relocate-mode [data-cms-editable] {
 
 .cms-move-btn i {
   color: #38bdf8;
+  font-size: 11px;
 }
 
 .cms-move-btn:hover,
@@ -1349,7 +1367,7 @@ body.cms-relocate-mode [data-cms-editable] {
   background: transparent;
   border: 0;
   color: #cbd5e1;
-  padding: 2px 6px;
+  padding: 2px 5px;
   font-size: 10px;
   cursor: pointer;
   border-radius: 4px;
@@ -1358,6 +1376,10 @@ body.cms-relocate-mode [data-cms-editable] {
 .cms-move-menu-toggle:hover {
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
+}
+
+.wp-nav-add-btn {
+  display: none !important;
 }
 
 /* Relocate Popover Menu - Portal Floating with Fixed Positioning */

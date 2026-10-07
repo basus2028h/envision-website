@@ -109,22 +109,52 @@
     try {
       const storedNav = localStorage.getItem(CMS_NAV_KEY);
       if (storedNav) {
-        const navList = JSON.parse(storedNav);
-        if (Array.isArray(navList) && navList.length > 0) {
-          const navContainers = document.querySelectorAll('.nav-links, .mobile-menu-inner');
-          navContainers.forEach((container) => {
-            const isMobile = container.classList.contains('mobile-menu-inner');
-            container.innerHTML = navList.map((item) => `<a href="${item.url}">${item.title}</a>`).join('');
-            if (isMobile && !container.querySelector('.mobile-connect')) {
-              const connect = document.createElement('a');
-              connect.href = 'contact.html';
-              connect.className = 'mobile-connect';
-              connect.textContent = 'Connect With Us';
-              container.append(connect);
-            }
-          });
+        let navList = JSON.parse(storedNav);
+        if (Array.isArray(navList)) {
+          let hasDirty = false;
+          // Filter out accidental dummy "New Tab" entries and clean titles
+          navList = navList
+            .filter((item) => {
+              const clean = (item.title || '').trim().toLowerCase().replace(/^move\s+/i, '');
+              if (clean === 'new tab' || !clean) {
+                hasDirty = true;
+                return false;
+              }
+              return true;
+            })
+            .map((item) => {
+              const cleanTitle = (item.title || '').replace(/^Move\s+/i, '').trim();
+              if (cleanTitle !== item.title) hasDirty = true;
+              return { ...item, title: cleanTitle };
+            });
+
+          if (hasDirty) {
+            localStorage.setItem(CMS_NAV_KEY, JSON.stringify(navList));
+          }
+
+          if (navList.length > 0) {
+            const navContainers = document.querySelectorAll('.nav-links, .mobile-menu-inner');
+            navContainers.forEach((container) => {
+              const isMobile = container.classList.contains('mobile-menu-inner');
+              container.innerHTML = navList.map((item) => `<a href="${item.url}">${item.title}</a>`).join('');
+              if (isMobile && !container.querySelector('.mobile-connect')) {
+                const connect = document.createElement('a');
+                connect.href = 'contact.html';
+                connect.className = 'mobile-connect';
+                connect.textContent = 'Connect With Us';
+                container.append(connect);
+              }
+            });
+          }
         }
       }
+      // Clean up any lingering + buttons or New Tab links in DOM
+      document.querySelectorAll('.wp-nav-add-btn').forEach(btn => btn.remove());
+      document.querySelectorAll('.nav-links > a, .mobile-menu-inner > a').forEach(a => {
+        if (a.textContent.trim().toLowerCase() === 'new tab') {
+          a.remove();
+        }
+      });
     } catch (e) {
       console.warn('[CMS] Failed to load global navigation:', e);
     }
@@ -274,6 +304,7 @@
         el.closest('.wp-nav-add-btn') ||
         el.closest('.cms-element-move-pill') ||
         el.closest('.cms-relocate-popover') ||
+        el.closest('.topbar, .nav-wrap, .nav-links, .mobile-menu, .logo-pair, .logo, .nav-cta') ||
         el.classList.contains('cms-ignore')
       ) return;
 
@@ -292,7 +323,12 @@
 
     // Images
     document.querySelectorAll('img:not(.cms-ignore)').forEach((img) => {
-      if (img.closest('#wp-admin-bar') || img.closest('#wp-sidebar-inspector') || img.closest('.cms-modal-backdrop')) return;
+      if (
+        img.closest('#wp-admin-bar') ||
+        img.closest('#wp-sidebar-inspector') ||
+        img.closest('.cms-modal-backdrop') ||
+        img.closest('.topbar, .nav-wrap, .logo-pair, .logo')
+      ) return;
 
       if (!img.getAttribute('data-cms-id')) {
         const id = img.id || `img_${pagePath.replace('.html', '')}_${imgCounter++}`;
@@ -345,6 +381,7 @@
         el.closest('.wp-section-bar') ||
         el.closest('.wp-add-section-divider') ||
         el.closest('.wp-add-card-placeholder') ||
+        el.closest('.topbar, .nav-wrap, .nav-links, .mobile-menu, .logo-pair, .logo, .nav-cta') ||
         el.classList.contains('wp-card-toolbar') ||
         el.classList.contains('wp-section-bar') ||
         el.classList.contains('cms-element-move-pill') ||
@@ -358,20 +395,8 @@
       attachHeroControls(hero);
     });
 
-    // Navigation Tab (+) Button in Topbar
-    const navLinks = document.querySelector('.nav-links');
-    if (navLinks && !navLinks.querySelector('.wp-nav-add-btn')) {
-      const addNavBtn = document.createElement('button');
-      addNavBtn.className = 'wp-nav-add-btn';
-      addNavBtn.type = 'button';
-      addNavBtn.title = 'Add Navigation Tab';
-      addNavBtn.innerHTML = '<i class="fa-solid fa-plus"></i>';
-      addNavBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openNavManagerModal();
-      });
-      navLinks.append(addNavBtn);
-    }
+    // Clean up any stray wp-nav-add-btn buttons
+    document.querySelectorAll('.wp-nav-add-btn').forEach(btn => btn.remove());
   }
 
   // ==========================================================================
@@ -630,12 +655,12 @@
     el.setAttribute('data-cms-relocatable', 'true');
 
     const pill = document.createElement('div');
-    pill.className = 'cms-element-move-pill';
+    pill.className = 'cms-element-move-pill cms-ignore';
     pill.innerHTML = `
-      <button type="button" class="cms-move-btn" title="Left-click and move freely in any direction across canvas">
-        <i class="fa-solid fa-arrows-up-down-left-right"></i> Move
+      <button type="button" class="cms-move-btn" title="Left-click and drag freely across canvas" aria-label="Drag to relocate">
+        <i class="fa-solid fa-arrows-up-down-left-right"></i>
       </button>
-      <button type="button" class="cms-move-menu-toggle" title="Relocate Options Menu">
+      <button type="button" class="cms-move-menu-toggle" title="Relocate Options Menu" aria-label="Relocate Options">
         <i class="fa-solid fa-caret-down"></i>
       </button>
     `;
@@ -1676,12 +1701,30 @@
     let navItems = [];
     const currentLinks = document.querySelectorAll('.nav-links > a:not(.nav-cta):not(.wp-nav-add-btn)');
     currentLinks.forEach((a) => {
-      navItems.push({ title: a.textContent.trim(), url: a.getAttribute('href') || '#' });
+      const clone = a.cloneNode(true);
+      clone.querySelectorAll('.cms-element-move-pill, .wp-nav-add-btn, .cms-ignore').forEach(p => p.remove());
+      const title = clone.textContent.replace(/^Move\s+/i, '').trim();
+      if (title && title.toLowerCase() !== 'new tab') {
+        navItems.push({ title, url: a.getAttribute('href') || '#' });
+      }
     });
 
     const stored = localStorage.getItem(CMS_NAV_KEY);
     if (stored) {
-      try { navItems = JSON.parse(stored); } catch (e) { }
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          navItems = parsed
+            .filter(item => {
+              const clean = (item.title || '').trim().toLowerCase().replace(/^move\s+/i, '');
+              return clean !== 'new tab' && clean.length > 0;
+            })
+            .map((item) => ({
+              ...item,
+              title: (item.title || '').replace(/^Move\s+/i, '').trim()
+            }));
+        }
+      } catch (e) { }
     }
 
     const backdrop = document.createElement('div');
@@ -1734,7 +1777,7 @@
     backdrop.querySelector('#wp-save-nav-btn').onclick = () => {
       const updatedList = [];
       backdrop.querySelectorAll('.wp-nav-item-row').forEach((row) => {
-        const title = row.querySelector('.wp-nav-title').value.trim();
+        const title = row.querySelector('.wp-nav-title').value.replace(/^Move\s+/i, '').trim();
         const url = row.querySelector('.wp-nav-url').value.trim();
         if (title && url) updatedList.push({ title, url });
       });

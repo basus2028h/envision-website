@@ -111,8 +111,10 @@ textarea {
 }
 
 .nav-wrap {
+  display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1.5rem;
   width: min(1200px, calc(100% - 2rem));
   margin: 0 auto;
 }
