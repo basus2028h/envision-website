@@ -3343,7 +3343,7 @@
               <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Quick Presets:</span>
               <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:5px;">
                 <button type="button" class="wp-preset-btn" data-preset-type="video" data-preset-src="https://cdn.coverr.co/videos/coverr-a-hands-on-start-up-pitch-1567798121770/1080p.mp4"><i class="fa-solid fa-video"></i> Pitch Event (Video)</button>
-                <button type="button" class="wp-preset-btn" data-preset-type="video" data-preset-src="My%20movie%207.mp4"><i class="fa-solid fa-video"></i> INSPIRE Hub Movie (Video)</button>
+                <button type="button" class="wp-preset-btn" data-preset-type="video" data-preset-src="WhatsApp%20Video%202026-10-08%20at%2001.06.07.mp4"><i class="fa-solid fa-video"></i> INSPIRE Hub Movie (Video)</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2070&auto=format&fit=crop"><i class="fa-solid fa-image"></i> Founders Team (Photo)</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop"><i class="fa-solid fa-image"></i> Summit Stage (Photo)</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"><i class="fa-solid fa-image"></i> Modern Architecture (Photo)</button>
@@ -3598,7 +3598,7 @@
                 <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=2070&auto=format&fit=crop"><i class="fa-solid fa-image"></i> Talks / Mic (Photo)</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=2070&auto=format&fit=crop"><i class="fa-solid fa-image"></i> Competition (Photo)</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="video" data-preset-src="https://cdn.coverr.co/videos/coverr-a-hands-on-start-up-pitch-1567798121770/1080p.mp4"><i class="fa-solid fa-video"></i> Pitch Event (Video)</button>
-                <button type="button" class="wp-preset-btn" data-preset-type="video" data-preset-src="My%20movie%207.mp4"><i class="fa-solid fa-video"></i> INSPIRE Movie (Video)</button>
+                <button type="button" class="wp-preset-btn" data-preset-type="video" data-preset-src="WhatsApp%20Video%202026-10-08%20at%2001.06.07.mp4"><i class="fa-solid fa-video"></i> INSPIRE Movie (Video)</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="video" data-preset-src="https://assets.mixkit.co/videos/preview/mixkit-software-developer-working-on-code-42866-large.mp4"><i class="fa-solid fa-video"></i> Tech Dev (Video)</button>
               </div>
             </div>
