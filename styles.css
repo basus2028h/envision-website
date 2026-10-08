@@ -281,8 +281,9 @@ textarea {
   min-height: 100vh;
   display: flex;
   align-items: center;
-  background: #020617;
+  background: var(--bg-2);
   overflow: hidden;
+  isolation: isolate;
 }
 
 .hero video {
@@ -291,20 +292,24 @@ textarea {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.18;
-  filter: saturate(0.8) brightness(0.75);
+  opacity: 0.62;
+  filter: brightness(1.08) saturate(0.95);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .hero::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(2, 6, 23, 0.9) 0%, rgba(2, 6, 23, 0.5) 40%, rgba(2, 6, 23, 0.8) 100%);
+  z-index: 1;
+  background: linear-gradient(90deg, rgba(248, 250, 252, 0.88) 0%, rgba(248, 250, 252, 0.65) 50%, rgba(248, 250, 252, 0.42) 100%),
+    radial-gradient(circle at top right, rgba(194, 139, 25, 0.12), transparent 40%);
 }
 
 .hero-content {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   width: min(1200px, calc(100% - 2rem));
   margin: 0 auto;
   padding-top: 5rem;
@@ -1195,17 +1200,23 @@ body::before {
 }
 
 .hero video {
-  opacity: 0.12;
-  filter: saturate(0.85) brightness(1.15);
+  opacity: 0.62;
+  filter: brightness(1.08) saturate(0.95);
 }
 
 .hero::after {
-  background: linear-gradient(90deg, rgba(248, 250, 252, 0.97) 0%, rgba(248, 250, 252, 0.78) 52%, rgba(248, 250, 252, 0.45) 100%);
+  background: linear-gradient(90deg, rgba(248, 250, 252, 0.88) 0%, rgba(248, 250, 252, 0.65) 50%, rgba(248, 250, 252, 0.42) 100%),
+    radial-gradient(circle at top right, rgba(194, 139, 25, 0.12), transparent 40%);
 }
 
 .eyebrow::before,
 .eyebrow::after {
   background: rgba(194, 139, 25, 0.8);
+}
+
+.hero h2 {
+  color: #111827;
+  text-shadow: 0 2px 8px rgba(255, 255, 255, 0.7);
 }
 
 .hero h2 .animated-word {
@@ -1216,9 +1227,9 @@ body::before {
 }
 
 .hero-copy {
-  color: #475569;
+  color: #172334;
   font-weight: 600;
-  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9), 0 0 10px rgba(255, 255, 255, 0.6);
 }
 
 .page-hero h1 {
@@ -1311,7 +1322,8 @@ body::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-hero-video {
+  .page-hero-video,
+  .hero video {
     display: none;
   }
 }
