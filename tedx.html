@@ -4,17 +4,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TEDx IIM Bodh Gaya | Envision E-Cell</title>
+  <title>TEDx IIM Bodh Gaya | Ideas Worth Spreading</title>
   <meta name="description"
-    content="TEDx IIM Bodh Gaya - Ideas worth spreading. An intellectual platform showcasing insight-rich conversations from founders, artists, builders, and thought leaders." />
+    content="TEDx IIM Bodh Gaya - An independently organized TED event showcasing insight-rich conversations from founders, artists, and leaders." />
+  <link rel="canonical" href="https://envision.iimbg.ac.in/tedx.html" />
+
+  <!-- Open Graph / Social Tags -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://envision.iimbg.ac.in/tedx.html" />
+  <meta property="og:title" content="TEDx IIM Bodh Gaya | Ideas Worth Spreading" />
+  <meta property="og:description" content="An independently organized TED event operated under license from TED at IIM Bodh Gaya." />
+  <meta property="og:image" content="https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=2070&auto=format&fit=crop" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="TEDx IIM Bodh Gaya | Ideas Worth Spreading" />
+  <meta name="twitter:description" content="An independently organized TED event operated under license from TED at IIM Bodh Gaya." />
+  <meta name="twitter:image" content="https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=2070&auto=format&fit=crop" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="cms.css" />
 </head>
 
 <body>
@@ -29,14 +43,15 @@
           <img src="envision-logo-transparent.png" alt="Envision E-Cell" />
         </a>
         <a href="index.html" class="logo-text logo-title-link" aria-label="Envision Home">
-          <h1>ENVISION</h1><span>E-Cell IIM Bodh Gaya</span>
+          <strong class="logo-title">ENVISION</strong><span>E-Cell IIM Bodh Gaya</span>
         </a>
       </div>
-      <nav class="nav-links">
+      <nav class="nav-links" aria-label="Main navigation">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
         <a href="events.html" class="active">Events</a>
         <a href="incubation.html">Incubation</a>
+        <a href="index.html#faq">FAQs</a>
         <a href="contact.html">Contact</a>
       </nav>
       <a href="contact.html" class="nav-cta">Connect With Us</a>
@@ -48,6 +63,7 @@
         <a href="about.html">About</a>
         <a href="events.html">Events</a>
         <a href="incubation.html">Incubation</a>
+        <a href="index.html#faq">FAQs</a>
         <a href="contact.html">Contact</a>
       </div>
     </div>
@@ -56,7 +72,7 @@
   <!-- Hero Section -->
   <section class="event-page-hero">
     <div class="event-hero-inner reveal">
-      <a href="events.html" class="event-breadcrumb" id="back-to-events-link">
+      <a data-cms-id="back-to-events-link" href="events.html" class="event-breadcrumb" id="back-to-events-link">
         <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to All Events
       </a>
       <div class="event-hero-badge-wrap">
@@ -67,16 +83,15 @@
           <i class="fa-solid fa-lightbulb"></i> Ideas Worth Spreading
         </span>
       </div>
-      <h1 class="event-hero-title"><span class="ted-red">TEDx</span> <span class="gradient-text">IIM Bodh Gaya</span>
-      </h1>
-      <p class="event-hero-subtitle">
+      <h1 data-cms-id="txt_tedx_1" class="event-hero-title"><span class="ted-red">TEDx</span> <span class="gradient-text animated-word" data-phrases="IIM Bodh Gaya|Ideas Worth Spreading|Visionary Talks|Changemakers">IIM Bodh Gaya</span></h1>
+      <p data-cms-id="txt_tedx_2" class="event-hero-subtitle">
         An intellectual platform showcasing insight-rich conversations from trailblazing founders, artists, researchers,
         and cultural leaders to spark curiosity and inspire positive change.
       </p>
       <div class="event-hero-actions">
-        <a href="contact.html?subject=TEDx+IIMBG+Attendee+Registration" class="btn btn-ted">Attend TEDx <i
+        <a data-cms-id="txt_tedx_3" href="contact.html?subject=TEDx+IIMBG+Attendee+Registration" class="btn btn-ted">Attend TEDx <i
             class="fa-solid fa-arrow-right"></i></a>
-        <a href="contact.html?subject=TEDx+Speaker+Nomination" class="btn btn-secondary"><i
+        <a data-cms-id="txt_tedx_4" href="contact.html?subject=TEDx+Speaker+Nomination" class="btn btn-secondary"><i
             class="fa-solid fa-user-plus"></i> Nominate Speaker</a>
       </div>
     </div>
@@ -121,37 +136,37 @@
     <section class="section" style="padding-top: 0;">
       <div class="container event-section-grid-2">
         <div class="text-block reveal">
-          <div class="section-label">The Platform</div>
-          <h2>Conversations that challenge <span class="gradient-text">assumptions.</span></h2>
-          <p>
+          <div data-cms-id="txt_tedx_5" class="section-label">The Platform</div>
+          <h2 data-cms-id="txt_tedx_6">Conversations that challenge <span class="gradient-text">assumptions.</span></h2>
+          <p data-cms-id="txt_tedx_7">
             In the spirit of ideas worth spreading, TEDx IIM Bodh Gaya is an independently organized TED event operated
             under license from TED. We curate an eclectic mix of speakers who are rethinking industries, unlocking human
             potential, and advocating for systemic social impact.
           </p>
-          <p>
+          <p data-cms-id="txt_tedx_8">
             From technological breakthroughs and climate solutions to philosophy, art, and resilience, our stage brings
             together voices that dare to imagine what lies beyond conventional boundaries.
           </p>
         </div>
 
         <div class="event-highlight-card reveal">
-          <div class="section-label">TEDx Impact</div>
+          <div data-cms-id="txt_tedx_9" class="section-label">TEDx Impact</div>
           <div class="event-stat-box-grid">
             <div class="event-stat-box ted-stat">
-              <h4 data-target="12" data-suffix="+">12+</h4>
-              <p>Curated Talks</p>
+              <h4 data-cms-id="txt_tedx_10" data-target="12" data-suffix="+">12+</h4>
+              <p data-cms-id="txt_tedx_11">Curated Talks</p>
             </div>
             <div class="event-stat-box ted-stat">
-              <h4 data-target="500" data-suffix="+">500+</h4>
-              <p>Live Attendees</p>
+              <h4 data-cms-id="txt_tedx_12" data-target="500" data-suffix="+">500+</h4>
+              <p data-cms-id="txt_tedx_13">Live Attendees</p>
             </div>
             <div class="event-stat-box ted-stat">
-              <h4 data-target="100" data-suffix="K+">100K+</h4>
-              <p>Global Views</p>
+              <h4 data-cms-id="txt_tedx_14" data-target="100" data-suffix="K+">100K+</h4>
+              <p data-cms-id="txt_tedx_15">Global Views</p>
             </div>
             <div class="event-stat-box ted-stat">
-              <h4 data-target="8" data-suffix="+">8+</h4>
-              <p>Diverse Disciplines</p>
+              <h4 data-cms-id="txt_tedx_16" data-target="8" data-suffix="+">8+</h4>
+              <p data-cms-id="txt_tedx_17">Diverse Disciplines</p>
             </div>
           </div>
         </div>
@@ -162,36 +177,36 @@
     <section class="section" style="background: rgba(7, 17, 29, 0.9);">
       <div class="container">
         <div class="section-heading reveal">
-          <div class="section-label">Multidisciplinary Verticals</div>
-          <h2>Exploring ideas across <span class="gradient-text">every dimension.</span></h2>
+          <div data-cms-id="txt_tedx_18" class="section-label">Multidisciplinary Verticals</div>
+          <h2 data-cms-id="txt_tedx_19">Exploring ideas across <span class="gradient-text">every dimension.</span></h2>
         </div>
 
         <div class="event-pillars-grid">
           <div class="event-pillar-card ted-pillar reveal">
             <div class="event-pillar-icon ted-icon"><i class="fa-solid fa-microchip"></i></div>
-            <h3>Technology &amp; Futures</h3>
-            <p>Artificial intelligence, quantum discoveries, synthetic biology, and ethical frontiers shaping human
+            <h3 data-cms-id="txt_tedx_20">Technology &amp; Futures</h3>
+            <p data-cms-id="txt_tedx_21">Artificial intelligence, quantum discoveries, synthetic biology, and ethical frontiers shaping human
               progress.</p>
           </div>
 
           <div class="event-pillar-card ted-pillar reveal">
             <div class="event-pillar-icon ted-icon"><i class="fa-solid fa-heart-pulse"></i></div>
-            <h3>Human Resilience</h3>
-            <p>Authentic stories of triumph against adversity, mental wellness, purpose-driven leadership, and community
+            <h3 data-cms-id="txt_tedx_22">Human Resilience</h3>
+            <p data-cms-id="txt_tedx_23">Authentic stories of triumph against adversity, mental wellness, purpose-driven leadership, and community
               empathy.</p>
           </div>
 
           <div class="event-pillar-card ted-pillar reveal">
             <div class="event-pillar-icon ted-icon"><i class="fa-solid fa-palette"></i></div>
-            <h3>Art &amp; Design Philosophy</h3>
-            <p>How storytelling, spatial architecture, musical composition, and creative expression spark new cultural
+            <h3 data-cms-id="txt_tedx_24">Art &amp; Design Philosophy</h3>
+            <p data-cms-id="txt_tedx_25">How storytelling, spatial architecture, musical composition, and creative expression spark new cultural
               dialogue.</p>
           </div>
 
           <div class="event-pillar-card ted-pillar reveal">
             <div class="event-pillar-icon ted-icon"><i class="fa-solid fa-seedling"></i></div>
-            <h3>Sustainable Futures</h3>
-            <p>Circular economic models, green energy frontiers, regenerative agriculture, and grassroots environmental
+            <h3 data-cms-id="txt_tedx_26">Sustainable Futures</h3>
+            <p data-cms-id="txt_tedx_27">Circular economic models, green energy frontiers, regenerative agriculture, and grassroots environmental
               stewardship.</p>
           </div>
         </div>
@@ -202,16 +217,16 @@
     <section class="section">
       <div class="container">
         <div class="section-heading reveal">
-          <div class="section-label">The TEDx Experience</div>
-          <h2>More than a conference, a <span class="gradient-text">mindset shift.</span></h2>
+          <div data-cms-id="txt_tedx_28" class="section-label">The TEDx Experience</div>
+          <h2 data-cms-id="txt_tedx_29">More than a conference, a <span class="gradient-text">mindset shift.</span></h2>
         </div>
 
         <div class="event-agenda-wrap reveal">
           <div class="event-agenda-card ted-agenda">
             <div class="event-agenda-time ted-time"><i class="fa-solid fa-star"></i> 18-Min Talks</div>
             <div class="event-agenda-info">
-              <h4>Crisp, High-Impact Narratives</h4>
-              <p>Each speaker is coached to deliver a concentrated, memorable narrative designed to spark curiosity and
+              <h4 data-cms-id="txt_tedx_30">Crisp, High-Impact Narratives</h4>
+              <p data-cms-id="txt_tedx_31">Each speaker is coached to deliver a concentrated, memorable narrative designed to spark curiosity and
                 prompt action.</p>
             </div>
           </div>
@@ -219,8 +234,8 @@
           <div class="event-agenda-card ted-agenda">
             <div class="event-agenda-time ted-time"><i class="fa-solid fa-wand-magic-sparkles"></i> Installations</div>
             <div class="event-agenda-info">
-              <h4>Interactive Art &amp; Tech Exhibits</h4>
-              <p>Immersive installations set up in the atrium where delegates experience student innovations and
+              <h4 data-cms-id="txt_tedx_32">Interactive Art &amp; Tech Exhibits</h4>
+              <p data-cms-id="txt_tedx_33">Immersive installations set up in the atrium where delegates experience student innovations and
                 creative expressions.</p>
             </div>
           </div>
@@ -228,8 +243,8 @@
           <div class="event-agenda-card ted-agenda">
             <div class="event-agenda-time ted-time"><i class="fa-solid fa-comments"></i> Circles</div>
             <div class="event-agenda-info">
-              <h4>Speaker Breakout Dialogues</h4>
-              <p>Post-session informal discussion pods where delegates interact directly with speakers, exchanging
+              <h4 data-cms-id="txt_tedx_34">Speaker Breakout Dialogues</h4>
+              <p data-cms-id="txt_tedx_35">Post-session informal discussion pods where delegates interact directly with speakers, exchanging
                 questions and perspectives.</p>
             </div>
           </div>
@@ -241,18 +256,21 @@
     <section class="section" style="padding-top: 2rem;">
       <div class="container reveal">
         <div class="event-cta-banner">
-          <div class="section-label"
+          <div data-cms-id="txt_tedx_36" class="section-label"
             style="margin-bottom: 1rem; color: #fca5a5; border-color: rgba(235,0,40,0.4); background: rgba(235,0,40,0.15);">
             Get Involved</div>
-          <h2>Join the intellectual <span class="gradient-text">gathering.</span></h2>
-          <p>
+          <h2 data-cms-id="txt_tedx_37">Join the intellectual <span class="gradient-text">gathering.</span></h2>
+          <p data-cms-id="txt_tedx_38">
             Delegate registrations and speaker nominations for the upcoming TEDx IIM Bodh Gaya edition are now open.
           </p>
           <div class="event-hero-actions" style="justify-content: center;">
-            <a href="contact.html?subject=TEDx+Delegate+Registration" class="btn btn-ted">Reserve Delegate Pass <i
+            <a data-cms-id="txt_tedx_39" href="contact.html?subject=TEDx+Delegate+Registration" class="btn btn-ted">Reserve Delegate Pass <i
                 class="fa-solid fa-arrow-right"></i></a>
-            <a href="contact.html?subject=TEDx+Speaker+Recommendation" class="btn btn-secondary">Recommend a Speaker</a>
+            <a data-cms-id="txt_tedx_40" href="contact.html?subject=TEDx+Speaker+Recommendation" class="btn btn-secondary">Recommend a Speaker</a>
           </div>
+          <p data-cms-id="txt_tedx_41" style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:20px; font-style:italic;">
+            This independent TEDx event is operated under license from TED. In the spirit of ideas worth spreading, TEDx is a program of local, self-organized events that bring people together to share a TED-like experience.
+          </p>
         </div>
       </div>
     </section>
@@ -267,44 +285,43 @@
           </video>
         </div>
         <div>
-          <h3
+          <h3 data-cms-id="txt_tedx_42"
             style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">
             Explore</h3>
           <ul class="footer-links">
-            <li><a href="about.html">About</a></li>
-            <li><a href="events.html">Events</a></li>
-            <li><a href="incubation.html">Incubation</a></li>
-            <li><a href="index.html#faq">FAQs</a></li>
-            <li><a href="contact.html">Contact</a></li>
+            <li><a data-cms-id="txt_tedx_44" href="about.html">About Us</a></li>
+            <li><a data-cms-id="txt_tedx_46" href="events.html">Events</a></li>
+            <li><a data-cms-id="txt_tedx_48" href="incubation.html">INSPIRE Incubation</a></li>
+            <li><a data-cms-id="txt_tedx_50" href="index.html#faq">FAQs</a></li>
+            <li><a data-cms-id="txt_tedx_52" href="contact.html">Contact Us</a></li>
           </ul>
         </div>
         <div>
-          <h3
+          <h3 data-cms-id="txt_tedx_53"
             style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">
             Reach Out</h3>
           <ul class="footer-links">
-            <li><a href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></li>
-            <li><a href="tel:+916312200238">+91 (0) 631 220 0238</a></li>
+            <li data-cms-id="txt_tedx_54">IIM Bodh Gaya Campus, Bihar 824234</li>
+            <li><a data-cms-id="txt_tedx_56" href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></li>
+            <li><a data-cms-id="txt_tedx_58" href="tel:+916312200238">+91 (0) 631 220 0238</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-meta">
         <span>© <span id="year"></span> ENVISION E-CELL IIM BODH GAYA</span>
-        <span><a href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer"
-            aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a
+        <span><a data-cms-id="txt_tedx_59" href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer"
+            aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a data-cms-id="txt_tedx_60"
             href="https://iimbg.ac.in/terms-conditions/" target="_blank" rel="noopener noreferrer"
-            aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> • <a
+            aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> • <a data-cms-id="txt_tedx_61"
             href="https://iimbg.ac.in/copyright-policy/" target="_blank" rel="noopener noreferrer"
-            aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a
+            aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a data-cms-id="txt_tedx_62"
             href="https://iimbg.ac.in/disclaimer/" target="_blank" rel="noopener noreferrer"
             aria-label="Disclaimer, opens in a new tab">Disclaimer</a></span>
       </div>
     </div>
   </footer>
 
-  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
-  <script src="cms.js"></script>
 </body>
 
 </html>

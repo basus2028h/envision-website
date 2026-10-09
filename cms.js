@@ -9,29 +9,238 @@
 
   // --- CMS Configuration ---
   const CMS_STORAGE_PREFIX = 'envision_cms_';
-  const CMS_AUTH_KEY = 'envision_cms_auth_token';
   const CMS_NAV_KEY = 'envision_cms_global_nav';
   const CMS_GLOBAL_STYLES_KEY = 'envision_cms_global_styles';
-  const CMS_DEFAULT_PASSKEY = 'envision@2026';
-  const CMS_SALT = 'envision_sec_salt_2026_cert';
-  const CMS_HASH_KEY = 'envision_cms_passkey_sha512';
-  const CMS_2FA_SECRET_KEY = 'envision_cms_2fa_secret';
-  const CMS_BACKUP_CODES_KEY = 'envision_cms_backup_codes';
-  const CMS_FAILED_ATTEMPTS_KEY = 'envision_cms_auth_fails';
-  const CMS_LOCKOUT_KEY = 'envision_cms_lockout_until';
-  const CMS_SESSIONS_REVOKED_KEY = 'envision_cms_revoked_before';
 
-  // Default RFC 6238 Base32 Secret & Emergency Backup Codes
-  const CMS_DEFAULT_2FA_SECRET = 'JBSWY3DPEHPK3PXP';
-  const CMS_DEFAULT_BACKUP_CODES = ['ENV-9842-SEC', 'ENV-3105-IIM', 'ENV-7712-BGX', 'ENV-5580-CERT'];
-
-  // Default precomputed SHA-512 for 'envision@2026' with salt
-  const CMS_DEFAULT_SHA512 = 'cf9855735f16022b267ffe65cb4d25ae569483b310b6f66db468c554fdff12bfe3235734c542de392c77fdb3d12036a7f035660dbfe690553441e68efdfd2d35';
-
-  const pagePath = window.location.pathname.split('/').pop() || 'index.html';
+  // Normalised so '/about', '/about.html' and a local file all map to the same database row.
+  const pagePath = (() => {
+    const last = window.location.pathname.split('/').pop() || 'index.html';
+    return /\.[a-z0-9]+$/i.test(last) ? last : last + '.html';
+  })();
   const pageStorageKey = CMS_STORAGE_PREFIX + 'content_' + pagePath;
   const gridStorageKey = CMS_STORAGE_PREFIX + 'grids_' + pagePath;
   const heroStorageKey = CMS_STORAGE_PREFIX + 'hero_' + pagePath;
+
+  // --- Sanitization & XSS Prevention Helpers ---
+  function sanitizeUrl(url) {
+    if (!url || typeof url !== 'string') return '#';
+    const trimmed = url.trim();
+    if (/^\/\//.test(trimmed) || /^(?:javascript|data|vbscript):/i.test(trimmed)) {
+      return '#';
+    }
+    try {
+      return encodeURI(decodeURI(trimmed));
+    } catch (e) {
+      return encodeURI(trimmed);
+    }
+  }
+
+  function isSafeStyleAttr(value) {
+    return !/url\s*\(|expression|@import|behavior|position\s*:\s*(?:fixed|sticky)|javascript:/i.test(value);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function isSafeImageSrc(value) {
+    if (typeof value !== 'string') return false;
+    const v = value.trim().replace(/[\u0000-\u0020]+/g, '');
+    if (!v) return false;
+    if (/^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(v)) return true;
+    if (/^https:\/\//i.test(v)) return true;
+    if (window.location.origin !== 'null' && v.indexOf(window.location.origin + '/') === 0) return true;
+    if (/^\/\//.test(v)) return false;
+    return !/^[a-z][a-z0-9+.-]*:/i.test(v); // plain relative path such as "photo.jpg" or "/img/a.png"
+  }
+
+  function isSafeTransform(value) {
+    return typeof value === 'string' && value.length <= 120 &&
+      /^(?:\s*(?:translate|translateX|translateY|translate3d|scale|scaleX|scaleY|rotate|skew|skewX|skewY)\([0-9a-z.,\s%+-]*\)\s*)*$/i.test(value);
+  }
+
+  function sanitizeGlobalStyles(styles) {
+    const clean = {};
+    Object.keys(styles || {}).forEach((key) => {
+      const value = styles[key];
+      // colours / lengths only: no ; { } < > quotes, url(), expression() etc.
+      if (typeof value === 'string' && value.length <= 64 && /^[#a-z0-9(),.%\s-]+$/i.test(value) && !/url|expression|import/i.test(value)) {
+        clean[key] = value;
+      }
+    });
+    return clean;
+  }
+
+  const ALLOWED_TAGS = new Set([
+    'A', 'ABBR', 'ADDRESS', 'ARTICLE', 'ASIDE', 'B', 'BDI', 'BDO', 'BLOCKQUOTE', 'BR',
+    'BUTTON', 'CITE', 'CODE', 'DATA', 'DD', 'DEL', 'DETAILS', 'DFN', 'DIV', 'DL', 'DT',
+    'EM', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HEADER',
+    'HGROUP', 'HR', 'I', 'IMG', 'INS', 'KBD', 'LI', 'MAIN', 'MARK', 'NAV',
+    'OL', 'P', 'PICTURE', 'PRE', 'Q', 'RP', 'RT', 'RUBY', 'S', 'SAMP', 'SECTION',
+    'SMALL', 'SOURCE', 'SPAN', 'STRONG', 'SUB', 'SUMMARY', 'SUP',
+    'TABLE', 'TBODY', 'TD', 'TFOOT', 'TH', 'THEAD', 'TIME', 'TR', 'U', 'UL', 'VAR', 'VIDEO', 'WBR'
+  ]);
+
+  const CMS_UI_SELECTOR = [
+    '#wp-admin-bar',
+    '#wp-word-ribbon',
+    '#wp-floating-toolbar',
+    '#wp-sidebar-inspector',
+    '#cms-trigger-btn',
+    '.cms-modal-backdrop',
+    '.cms-toast',
+    '.wp-section-bar',
+    '.wp-add-section-divider',
+    '.wp-nav-add-btn',
+    '.wp-card-toolbar',
+    '.wp-add-card-placeholder',
+    '.wp-hero-edit-pill',
+    '.wp-card-media-pill',
+    '.cms-element-move-pill',
+    '.cms-relocate-popover',
+    '.cms-drop-indicator-line',
+    '.cms-ignore',
+    '.cms-ghost',
+    '.cms-drag-tooltip',
+    '.cms-drop-placeholder'
+  ].join(', ');
+
+  function getCleanElementHtml(el) {
+    if (!el) return '';
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll(CMS_UI_SELECTOR).forEach((node) => node.remove());
+    clone.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
+    clone.querySelectorAll('[data-cms-relocatable]').forEach((node) => node.removeAttribute('data-cms-relocatable'));
+    clone.querySelectorAll('[data-cms-editable], [data-cms-editable-image]').forEach((node) => {
+      node.removeAttribute('data-cms-editable');
+      node.removeAttribute('data-cms-editable-image');
+    });
+    clone.querySelectorAll('[data-cms-card]').forEach((node) => {
+      node.removeAttribute('data-cms-card');
+    });
+    clone.querySelectorAll('img[data-cms-id][src]').forEach((node) => {
+      if (/^data:image\//i.test(node.getAttribute('src') || '')) {
+        node.removeAttribute('src');
+      }
+    });
+    clone.querySelectorAll('.cms-dragging, .cms-drop-target-before, .cms-drop-target-after, .cms-move-active').forEach((node) => {
+      node.classList.remove('cms-dragging', 'cms-drop-target-before', 'cms-drop-target-after', 'cms-move-active');
+    });
+    return clone.innerHTML;
+  }
+
+  const FORBIDDEN_TAGS = new Set(['SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'STYLE', 'LINK', 'META', 'FORM', 'INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'APPLET', 'BASE', 'SVG', 'MATH', 'NOSCRIPT']);
+
+  function sanitizeHtml(html) {
+    if (!html || typeof html !== 'string') return '';
+    const template = document.createElement('template');
+    template.innerHTML = html;
+
+    // Immediately remove any CMS UI elements, move pills, or editor toolbars that might have been stored in HTML
+    template.content.querySelectorAll(CMS_UI_SELECTOR).forEach((node) => node.remove());
+    template.content.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
+    template.content.querySelectorAll('[data-cms-relocatable]').forEach((node) => node.removeAttribute('data-cms-relocatable'));
+
+    template.content.querySelectorAll('*').forEach((node) => {
+      const tag = node.tagName.toUpperCase();
+      if (FORBIDDEN_TAGS.has(tag)) {
+        node.remove();
+        return;
+      }
+      if (!ALLOWED_TAGS.has(tag)) {
+        node.replaceWith(...Array.from(node.childNodes));
+        return;
+      }
+
+      // Filter attributes
+      Array.from(node.attributes).forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        const val = attr.value;
+
+        // Remove all on* event handler attributes
+        if (name.startsWith('on') || name.includes(':')) {
+          node.removeAttribute(attr.name);
+          return;
+        }
+
+        if (name === 'style' && !isSafeStyleAttr(val)) {
+          node.removeAttribute(attr.name);
+          return;
+        }
+
+        // Validate links
+        if (name === 'href' || name === 'src' || name === 'poster' || name === 'action') {
+          const normalized = val.trim().replace(/[\u0000-\u0020]+/g, '');
+          const isRasterDataImg = tag === 'IMG' && name === 'src' && isSafeImageSrc(val) && /^data:/i.test(normalized);
+          if (/^\/\//.test(normalized) || (!isRasterDataImg && /^(?:javascript|data|vbscript|file|about):/i.test(normalized))) {
+            node.removeAttribute(attr.name);
+            return;
+          }
+          if (tag === 'A') {
+            node.setAttribute('rel', 'noopener noreferrer');
+          }
+        }
+        if (name === 'data-cms-card') {
+          node.removeAttribute(attr.name);
+        }
+      });
+    });
+
+    return template.innerHTML;
+  }
+
+  async function getAuthorizedSession() {
+    if (!window.supabaseClient) {
+      return null;
+    }
+    try {
+      const { data, error } = await window.supabaseClient.auth.getSession();
+      if (error || !data.session) return null;
+      const role = data.session.user?.app_metadata?.role;
+      if (role !== 'admin') return null;
+      if (window.supabaseClient.auth.mfa?.getAuthenticatorAssuranceLevel) {
+        const { data: assurance, error: assuranceError } =
+          await window.supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (assuranceError) return null;
+        if (assurance?.nextLevel === 'aal2' && assurance?.currentLevel !== 'aal2') {
+          return null;
+        }
+      }
+      return data.session;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function completeMfaChallenge(session, code) {
+    const { data: factors, error: factorsError } =
+      await window.supabaseClient.auth.mfa.listFactors();
+    if (factorsError) throw factorsError;
+
+    const factor = factors?.totp?.find((item) => item.status === 'verified');
+    if (!factor) {
+      throw new Error('No verified authenticator app is enrolled for this admin account.');
+    }
+
+    const { data: challenge, error: challengeError } =
+      await window.supabaseClient.auth.mfa.challenge({ factorId: factor.id });
+    if (challengeError) throw challengeError;
+
+    const { data: verified, error: verifyError } =
+      await window.supabaseClient.auth.mfa.verify({
+        factorId: factor.id,
+        challengeId: challenge.id,
+        code: String(code).replace(/\s/g, '')
+      });
+    if (verifyError) throw verifyError;
+    return verified?.session || session;
+  }
 
   let isEditMode = false;
   let activeElement = null;
@@ -39,8 +248,8 @@
   let globalStyles = {};
   let pageHeroSettings = null;
 
-  // --- Initializer ---
-  document.addEventListener('DOMContentLoaded', async () => {
+  async function initCMS() {
+    document.querySelectorAll('.wp-card-media-pill').forEach(p => p.remove());
     loadGlobalNavigation();
     loadGlobalStyles();
     loadPageContent();
@@ -48,11 +257,93 @@
     await checkAuthSession();
     setupShortcuts();
     setupEditModeGuards();
+    await syncContentFromSupabase();
+  }
+
+  // --- Initializer (handles both standard and lazy dynamic script loading) ---
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCMS);
+  } else {
+    initCMS();
+  }
+
+  window.openAdminStudio = async () => {
+    const session = await getAuthorizedSession();
+    if (session) {
+      setEditMode(!isEditMode);
+      if (isEditMode) {
+        showToast('Edit Mode Enabled. Click any text, card, or image to edit!', 'success');
+      }
+    } else {
+      openLoginModal();
+    }
+  };
+
+  window.addEventListener('supabaseReady', async () => {
+    await syncContentFromSupabase();
+    await checkAuthSession();
   });
 
   // ==========================================================================
   // 1. Storage & Global Hydration
   // ==========================================================================
+
+  async function syncContentFromSupabase() {
+    if (!window.supabaseClient) return;
+    try {
+      const { data: globalData } = await window.supabaseClient
+        .from('site_content')
+        .select('*')
+        .eq('page_path', '_global')
+        .maybeSingle();
+
+      if (globalData && globalData.global_styles) {
+        globalStyles = { ...globalStyles, ...globalData.global_styles };
+        applyGlobalStyles(globalStyles);
+        localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles));
+        if (Array.isArray(globalData.global_styles._nav) && globalData.global_styles._nav.length > 0) {
+          localStorage.setItem(CMS_NAV_KEY, JSON.stringify(globalData.global_styles._nav));
+          loadGlobalNavigation();
+        }
+      }
+
+      const { data, error } = await window.supabaseClient
+        .from('site_content')
+        .select('*')
+        .eq('page_path', pagePath)
+        .maybeSingle();
+
+      if (!error && data) {
+        if (data.grid_data && Object.keys(data.grid_data).length > 0) {
+          Object.keys(data.grid_data).forEach((gridId) => {
+            const gridEl = document.querySelector(`[data-cms-grid-id="${gridId}"]`);
+            if (gridEl && data.grid_data[gridId]) {
+              gridEl.innerHTML = sanitizeHtml(data.grid_data[gridId]);
+            }
+          });
+          localStorage.setItem(gridStorageKey, JSON.stringify(data.grid_data));
+        }
+
+        if (data.content_data && Object.keys(data.content_data).length > 0) {
+          pageContentMap = { ...pageContentMap, ...data.content_data };
+          applyPageContent(pageContentMap);
+          localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
+        }
+
+        if (data.global_styles && Object.keys(data.global_styles).length > 0) {
+          globalStyles = { ...globalStyles, ...data.global_styles };
+          applyGlobalStyles(globalStyles);
+          localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles));
+          if (Array.isArray(data.global_styles._nav) && data.global_styles._nav.length > 0) {
+            localStorage.setItem(CMS_NAV_KEY, JSON.stringify(data.global_styles._nav));
+            loadGlobalNavigation();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Supabase] Content sync notice:', e);
+    }
+  }
 
   function loadPageContent() {
     try {
@@ -63,7 +354,7 @@
         Object.keys(gridMap).forEach((gridId) => {
           const gridEl = document.querySelector(`[data-cms-grid-id="${gridId}"]`);
           if (gridEl && gridMap[gridId]) {
-            gridEl.innerHTML = gridMap[gridId];
+            gridEl.innerHTML = sanitizeHtml(gridMap[gridId]);
           }
         });
       }
@@ -90,16 +381,19 @@
       const el = document.querySelector(`[data-cms-id="${key}"]`);
       if (el) {
         if (data.type === 'text' && data.html !== undefined) {
-          el.innerHTML = data.html;
+          el.innerHTML = sanitizeHtml(data.html);
+          if ((el.tagName === 'A' || el.hasAttribute('href')) && data.href) {
+            el.setAttribute('href', sanitizeUrl(data.href));
+            if (data.target) el.setAttribute('target', data.target);
+          }
         } else if (data.type === 'image' && data.src) {
-          el.src = data.src;
+          if (isSafeImageSrc(data.src)) el.src = data.src;
           if (data.alt) el.alt = data.alt;
         }
         if (data.style) {
-          if (data.style.transform) el.style.transform = data.style.transform;
+          if (isSafeTransform(data.style.transform)) el.style.transform = data.style.transform;
           if (data.style.offsetX !== undefined) el.setAttribute('data-cms-offset-x', data.style.offsetX);
           if (data.style.offsetY !== undefined) el.setAttribute('data-cms-offset-y', data.style.offsetY);
-          Object.assign(el.style, data.style);
         }
       }
     });
@@ -136,7 +430,7 @@
             const navContainers = document.querySelectorAll('.nav-links, .mobile-menu-inner');
             navContainers.forEach((container) => {
               const isMobile = container.classList.contains('mobile-menu-inner');
-              container.innerHTML = navList.map((item) => `<a href="${item.url}">${item.title}</a>`).join('');
+              container.innerHTML = navList.map((item) => `<a href="${sanitizeUrl(item.url)}">${escapeHtml(item.title)}</a>`).join('');
               if (isMobile && !container.querySelector('.mobile-connect')) {
                 const connect = document.createElement('a');
                 connect.href = 'contact.html';
@@ -174,6 +468,7 @@
 
   function applyGlobalStyles(styles) {
     if (!styles) return;
+    styles = sanitizeGlobalStyles(styles);
     let customStyleTag = document.getElementById('cms-dynamic-global-styles');
     if (!customStyleTag) {
       customStyleTag = document.createElement('style');
@@ -308,13 +603,20 @@
         el.classList.contains('cms-ignore')
       ) return;
 
-      // Avoid making an outer <a> editable if it has block child headings that are individually editable
-      if (el.tagName === 'A' && el.querySelector('h1, h2, h3, h4, h5, h6, p')) {
+      // Avoid making an outer <li> or <a> editable if it has child links or block headings that are individually editable
+      if (el.tagName === 'LI' && el.querySelector('a, button, input, h1, h2, h3, h4, h5, h6, p')) {
+        return;
+      }
+      if (el.tagName === 'A' && el.querySelector('h1, h2, h3, h4, h5, h6, p, div, article')) {
         return;
       }
 
       if (!el.getAttribute('data-cms-id')) {
-        const id = el.id || `txt_${pagePath.replace('.html', '')}_${textCounter++}`;
+        let id = el.id;
+        if (!id) {
+          do { id = `txt_${pagePath.replace('.html', '')}_${textCounter++}`; }
+          while (document.querySelector(`[data-cms-id="${id}"]`));
+        }
         el.setAttribute('data-cms-id', id);
       }
       el.setAttribute('data-cms-editable', 'true');
@@ -331,7 +633,11 @@
       ) return;
 
       if (!img.getAttribute('data-cms-id')) {
-        const id = img.id || `img_${pagePath.replace('.html', '')}_${imgCounter++}`;
+        let id = img.id;
+        if (!id) {
+          do { id = `img_${pagePath.replace('.html', '')}_${imgCounter++}`; }
+          while (document.querySelector(`[data-cms-id="${id}"]`));
+        }
         img.setAttribute('data-cms-id', id);
       }
       img.setAttribute('data-cms-editable-image', 'true');
@@ -341,7 +647,10 @@
     // Card Row Containers & Grids
     document.querySelectorAll('.cards-grid, .grid-3, .grid-4, .stat-grid, .faq-accordion').forEach((grid) => {
       if (!grid.getAttribute('data-cms-grid-id')) {
-        grid.setAttribute('data-cms-grid-id', `grid_${pagePath.replace('.html', '')}_${gridCounter++}`);
+        let gid;
+        do { gid = `grid_${pagePath.replace('.html', '')}_${gridCounter++}`; }
+        while (document.querySelector(`[data-cms-grid-id="${gid}"]`));
+        grid.setAttribute('data-cms-grid-id', gid);
       }
       attachGridCardInserter(grid);
     });
@@ -351,10 +660,8 @@
       attachCardToolbar(card);
     });
 
-    // Card Media Containers (Photo & Video Palettes)
-    document.querySelectorAll('.card-media, .leader-card-media, .card figure').forEach((wrap) => {
-      attachCardMediaControls(wrap);
-    });
+    // Remove any legacy card media pills
+    document.querySelectorAll('.wp-card-media-pill').forEach((pill) => pill.remove());
 
     // Section Bars & Inserter Dividers
     document.querySelectorAll('section, main > div').forEach((section) => {
@@ -784,7 +1091,7 @@
       popover.querySelector('[data-act="dup"]').onclick = (ev) => {
         ev.stopPropagation();
         const clone = el.cloneNode(true);
-        clone.querySelectorAll('.cms-element-move-pill').forEach(p => p.remove());
+        clone.querySelectorAll(CMS_UI_SELECTOR).forEach(p => p.remove());
         clone.querySelectorAll('[data-cms-id]').forEach(c => {
           c.setAttribute('data-cms-id', c.getAttribute('data-cms-id') + '_m_' + Date.now().toString().slice(-4));
         });
@@ -875,7 +1182,7 @@
       const heading = sec.querySelector('h1, h2, h3')?.textContent.trim() || sec.id || `Section #${idx + 1}`;
       return `
               <button type="button" class="cms-relocate-section-target" data-sec-idx="${idx}" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; text-align:left; font-size:13px; font-weight:600; color:#0f172a; transition:all 0.15s;">
-                <span><i class="fa-solid fa-layer-group" style="color:#3b82f6; margin-right:8px;"></i> ${heading}</span>
+                <span><i class="fa-solid fa-layer-group" style="color:#3b82f6; margin-right:8px;"></i> ${escapeHtml(heading)}</span>
                 <i class="fa-solid fa-arrow-right" style="color:#94a3b8; font-size:11px;"></i>
               </button>
             `;
@@ -964,26 +1271,19 @@
   }
 
   function attachCardMediaControls(mediaWrap) {
-    if (!mediaWrap || mediaWrap.querySelector(':scope > .wp-card-media-pill')) return;
-    mediaWrap.style.position = 'relative';
-    const pill = document.createElement('button');
-    pill.type = 'button';
-    pill.className = 'wp-card-media-pill';
-    pill.title = 'Change Card Photo or Video';
-    pill.innerHTML = `<i class="fa-solid fa-photo-film"></i> Media`;
-    pill.onclick = (e) => {
-      e.stopPropagation();
-      openCardMediaModal(mediaWrap);
-    };
-    mediaWrap.append(pill);
+    if (!mediaWrap) return;
+    mediaWrap.querySelectorAll('.wp-card-media-pill').forEach((p) => p.remove());
   }
 
   function duplicateCardInRow(card) {
     const clone = card.cloneNode(true);
-    clone.querySelectorAll('.wp-card-toolbar, .cms-element-move-pill').forEach(tb => tb.remove());
+    clone.querySelectorAll(CMS_UI_SELECTOR).forEach(tb => tb.remove());
     clone.querySelectorAll('[data-cms-id]').forEach(el => {
       el.setAttribute('data-cms-id', el.getAttribute('data-cms-id') + '_c_' + Date.now().toString().slice(-4));
     });
+    if (clone.classList.contains('reveal')) {
+      clone.classList.add('active');
+    }
 
     card.parentNode.insertBefore(clone, card.nextSibling);
     attachCardToolbar(clone);
@@ -1009,7 +1309,7 @@
         duplicateCardInRow(existingCard);
       } else {
         const newCard = document.createElement('article');
-        newCard.className = 'card reveal';
+        newCard.className = 'card reveal active';
         newCard.innerHTML = `
           <div class="card-body">
             <h3>New Feature / Card</h3>
@@ -1082,6 +1382,7 @@
     bar.querySelector('[data-act="dup"]').onclick = (e) => {
       e.stopPropagation();
       const clone = section.cloneNode(true);
+      clone.querySelectorAll(CMS_UI_SELECTOR).forEach((p) => p.remove());
       clone.querySelectorAll('[data-cms-id]').forEach((el) => {
         el.setAttribute('data-cms-id', el.getAttribute('data-cms-id') + '_s_' + Date.now().toString().slice(-4));
       });
@@ -1119,11 +1420,15 @@
         const temp = document.createElement('div');
         temp.innerHTML = newSectionHTML;
         const newEl = temp.firstElementChild;
-        section.parentNode.insertBefore(newEl, divider.nextSibling);
-        prepareEditableDOM();
-        setEditMode(true);
-        markDirty();
-        showToast('New section added! Click to customize.', 'success');
+        if (newEl) {
+          if (newEl.classList.contains('reveal')) newEl.classList.add('active');
+          newEl.querySelectorAll('.reveal').forEach((r) => r.classList.add('active'));
+          section.parentNode.insertBefore(newEl, divider.nextSibling);
+          prepareEditableDOM();
+          setEditMode(true);
+          markDirty();
+          showToast('New section added! Click to customize.', 'success');
+        }
       });
     };
 
@@ -1190,7 +1495,7 @@
     if (id) {
       pageContentMap[id] = pageContentMap[id] || {};
       pageContentMap[id].type = 'text';
-      pageContentMap[id].html = el.innerHTML;
+      pageContentMap[id].html = getCleanElementHtml(el);
     }
   }
 
@@ -1739,8 +2044,8 @@
         <div class="wp-nav-manager-list" id="wp-nav-list-container">
           ${navItems.map((item, i) => `
             <div class="wp-nav-item-row" data-index="${i}">
-              <input type="text" class="wp-nav-title" value="${item.title}" placeholder="Tab Label" />
-              <input type="text" class="wp-nav-url" value="${item.url}" placeholder="URL (e.g. events.html)" />
+              <input type="text" class="wp-nav-title" value="${escapeHtml(item.title)}" placeholder="Tab Label" />
+              <input type="text" class="wp-nav-url" value="${escapeHtml(item.url)}" placeholder="URL (e.g. events.html)" />
               <button type="button" class="wp-nav-item-del" title="Remove Tab"><i class="fa-solid fa-trash"></i></button>
             </div>
           `).join('')}
@@ -1878,19 +2183,20 @@
   }
 
   function generateEventPageHTML(title, tagline, filename) {
+    const cleanTitle = escapeHtml(title);
+    const cleanTagline = escapeHtml(tagline);
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title} | Envision E-Cell</title>
-  <meta name="description" content="${tagline} - Organized by Envision E-Cell IIM Bodh Gaya." />
+  <title>${cleanTitle} | Envision E-Cell</title>
+  <meta name="description" content="${cleanTagline} - Organized by Envision E-Cell IIM Bodh Gaya." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="cms.css" />
 </head>
 <body>
   <header class="topbar">
@@ -1921,8 +2227,8 @@
   <section class="page-hero">
     <div class="page-hero-inner reveal">
       <div class="section-label"><i class="fa-solid fa-calendar-star"></i> Featured Flagship Event</div>
-      <h1>${title}</h1>
-      <p class="hero-tagline">${tagline}</p>
+      <h1>${cleanTitle}</h1>
+      <p class="hero-tagline">${cleanTagline}</p>
       <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
         <a href="#register" class="btn btn-primary"><i class="fa-solid fa-ticket"></i> Register Now</a>
         <a href="#about-event" class="btn btn-secondary"><i class="fa-solid fa-info-circle"></i> Learn More</a>
@@ -1936,10 +2242,10 @@
         <div class="text-block reveal">
           <div class="section-label">About the Event</div>
           <h2>Building the next wave of founders.</h2>
-          <p>${title} is the marquee entrepreneurial gathering bringing together students, startups, innovators, and investors for an intensive journey of learning, collaboration, and pitching.</p>
+          <p>${cleanTitle} is the marquee entrepreneurial gathering bringing together students, startups, innovators, and investors for an intensive journey of learning, collaboration, and pitching.</p>
         </div>
         <div class="image-panel reveal">
-          <img src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop" alt="${title}" />
+          <img src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop" alt="${cleanTitle}" />
         </div>
       </div>
     </section>
@@ -1948,7 +2254,7 @@
       <div class="container">
         <div class="promo-band reveal">
           <div class="section-label">Join the Experience</div>
-          <h2>Be part of ${title} at IIM Bodh Gaya.</h2>
+          <h2>Be part of ${cleanTitle} at IIM Bodh Gaya.</h2>
           <p>Registrations are now open for teams and individual innovators across India.</p>
           <a href="contact.html" class="btn btn-primary">Get in Touch / Register <i class="fa-solid fa-arrow-right"></i></a>
         </div>
@@ -1965,7 +2271,6 @@
   </footer>
 
   <script src="script.js"></script>
-  <script src="cms.js"></script>
 </body>
 </html>`;
   }
@@ -2585,7 +2890,7 @@
         <button type="button" class="wp-bar-btn" id="wp-hero-media-btn"><i class="fa-solid fa-photo-film"></i> Hero Media</button>
         <button type="button" class="wp-bar-btn" id="wp-global-styles-btn"><i class="fa-solid fa-palette"></i> Theme Studio</button>
         <button type="button" class="wp-bar-btn" id="wp-nav-manager-btn"><i class="fa-solid fa-bars"></i> Menus &amp; Tabs</button>
-        <button type="button" class="wp-bar-btn" id="wp-security-vault-btn" title="CERT-In Cryptographic Security & 2-Step Verification Vault"><i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Security Vault</button>
+        <button type="button" class="wp-bar-btn" id="wp-security-vault-btn" title="Passkey Security &amp; Session Management"><i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Security Vault</button>
         <button type="button" class="wp-bar-btn btn-publish" id="wp-publish-btn"><i class="fa-solid fa-cloud-arrow-up"></i> Publish Changes</button>
         <button type="button" class="wp-bar-btn" id="wp-export-btn" title="Download clean updated HTML"><i class="fa-solid fa-download"></i> Export HTML</button>
         <button type="button" class="wp-bar-btn" id="wp-logout-btn" title="Exit Visual Studio"><i class="fa-solid fa-right-from-bracket"></i></button>
@@ -3138,41 +3443,22 @@
       openTemplateLibraryModal((html) => {
         const temp = document.createElement('div');
         temp.innerHTML = html;
-        document.querySelector('main')?.append(temp.firstElementChild);
-        prepareEditableDOM();
-        setEditMode(true);
-        markDirty();
-        showToast('Section block added to page!', 'success');
+        const newEl = temp.firstElementChild;
+        if (newEl) {
+          if (newEl.classList.contains('reveal')) newEl.classList.add('active');
+          newEl.querySelectorAll('.reveal').forEach((r) => r.classList.add('active'));
+          document.querySelector('main')?.append(newEl);
+          prepareEditableDOM();
+          setEditMode(true);
+          markDirty();
+          showToast('Section block added to page!', 'success');
+        }
       });
     };
     document.getElementById('wp-security-vault-btn').onclick = openSecurityVaultModal;
     document.getElementById('wp-publish-btn').onclick = saveAllChanges;
     document.getElementById('wp-export-btn').onclick = exportPageHTML;
     document.getElementById('wp-logout-btn').onclick = logoutAdmin;
-
-    // Corner Trigger Button
-    injectTriggerButton();
-  }
-
-  function injectTriggerButton() {
-    let trigger = document.getElementById('cms-trigger-btn');
-    if (!trigger) {
-      trigger = document.createElement('button');
-      trigger.id = 'cms-trigger-btn';
-      trigger.type = 'button';
-      trigger.title = 'WordPress Visual Studio (Ctrl + Shift + E)';
-      trigger.innerHTML = '<i class="fa-solid fa-key"></i>';
-      trigger.onclick = async () => {
-        const rawToken = sessionStorage.getItem(CMS_AUTH_KEY);
-        const isValid = rawToken ? await verifySessionToken(rawToken) : false;
-        if (isValid) {
-          setEditMode(!isEditMode);
-        } else {
-          openLoginModal();
-        }
-      };
-      document.body.append(trigger);
-    }
   }
 
   // ==========================================================================
@@ -3331,7 +3617,7 @@
           <!-- 2. Source URL or Local File -->
           <div class="wp-panel-group">
             <label class="wp-control-label" style="display:block; margin-bottom: 6px;">2. Media Source (Web URL or Upload):</label>
-            <input type="text" id="wp-hero-url-input" class="wp-input" style="width:100%; margin-bottom:8px;" value="${temp.src || ''}" placeholder="https://example.com/video.mp4 or https://images.unsplash.com/..." />
+            <input type="text" id="wp-hero-url-input" class="wp-input" style="width:100%; margin-bottom:8px;" value="${escapeHtml(temp.src || '')}" placeholder="https://example.com/video.mp4 or https://images.unsplash.com/..." />
             
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
               <span style="font-size:12px; color:#64748b; font-weight:600;">Or Upload from Computer:</span>
@@ -3356,8 +3642,8 @@
             <div class="wp-panel-heading">3. Page Area Coverage &amp; Sizing Controls</div>
             
             <div class="wp-control-row">
-              <span class="wp-control-label">Width Coverage (<span id="wp-hero-width-val">${temp.width || 100}%</span>):</span>
-              <input type="range" id="wp-hero-width-slider" min="20" max="100" step="5" value="${temp.width || 100}" style="flex:1; max-width:260px;" />
+              <span class="wp-control-label">Width Coverage (<span id="wp-hero-width-val">${escapeHtml(temp.width || 100)}%</span>):</span>
+              <input type="range" id="wp-hero-width-slider" min="20" max="100" step="5" value="${escapeHtml(temp.width || 100)}" style="flex:1; max-width:260px;" />
             </div>
 
             <div class="wp-control-row">
@@ -3395,8 +3681,8 @@
             </div>
 
             <div class="wp-control-row">
-              <span class="wp-control-label">Background Blur (<span id="wp-hero-blur-val">${temp.blur || 0}px</span>):</span>
-              <input type="range" id="wp-hero-blur-slider" min="0" max="25" step="1" value="${temp.blur || 0}" style="flex:1; max-width:260px;" />
+              <span class="wp-control-label">Background Blur (<span id="wp-hero-blur-val">${escapeHtml(temp.blur || 0)}px</span>):</span>
+              <input type="range" id="wp-hero-blur-slider" min="0" max="25" step="1" value="${escapeHtml(temp.blur || 0)}" style="flex:1; max-width:260px;" />
             </div>
           </div>
 
@@ -3583,7 +3869,7 @@
           <!-- 2. Source URL or Local Upload -->
           <div class="wp-panel-group">
             <label class="wp-control-label" style="display:block; margin-bottom: 6px;">2. Media Source (Web URL or Upload):</label>
-            <input type="text" id="wp-card-media-url" class="wp-input" style="width:100%; margin-bottom:8px;" value="${temp.src.startsWith('data:') ? '' : temp.src}" placeholder="https://example.com/video.mp4 or https://images.unsplash.com/..." />
+            <input type="text" id="wp-card-media-url" class="wp-input" style="width:100%; margin-bottom:8px;" value="${escapeHtml(temp.src.startsWith('data:') ? '' : temp.src)}" placeholder="https://example.com/video.mp4 or https://images.unsplash.com/..." />
             
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
               <span style="font-size:12px; color:#64748b; font-weight:600;">Or Upload from Computer:</span>
@@ -3609,7 +3895,7 @@
             <div class="wp-panel-heading">3. Badge Tag &amp; Layout Controls</div>
             <div class="wp-control-row">
               <span class="wp-control-label">Card Badge Pill Text (e.g. SUMMIT, TALKS, COMPETITION):</span>
-              <input type="text" id="wp-card-badge-input" class="wp-input" style="width:200px;" value="${temp.badge}" placeholder="Leave empty for no badge" />
+              <input type="text" id="wp-card-badge-input" class="wp-input" style="width:200px;" value="${escapeHtml(temp.badge)}" placeholder="Leave empty for no badge" />
             </div>
             <div class="wp-control-row">
               <span class="wp-control-label">Card Media Height:</span>
@@ -3630,7 +3916,7 @@
             </div>
             <div class="wp-control-row">
               <span class="wp-control-label">Alt / SEO Description:</span>
-              <input type="text" id="wp-card-alt-input" class="wp-input" style="width:200px;" value="${temp.alt}" placeholder="Card Media description" />
+              <input type="text" id="wp-card-alt-input" class="wp-input" style="width:200px;" value="${escapeHtml(temp.alt)}" placeholder="Card Media description" />
             </div>
           </div>
 
@@ -3731,8 +4017,6 @@
           } else if (badgeEl) {
             badgeEl.remove();
           }
-
-          attachCardMediaControls(container);
         } else if (targetEl.tagName === 'IMG' || targetEl.tagName === 'VIDEO') {
           // Standalone image or video
           if (mediaType === 'video') {
@@ -3800,683 +4084,153 @@
     return diff === 0;
   }
 
-  /**
-   * Salted SHA-512 Cryptographic Hasher
-   */
-  async function hashPasskey(plaintext) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(plaintext + ':' + CMS_SALT);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-512', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  function getStoredPasskeyHash() {
-    return localStorage.getItem(CMS_HASH_KEY) || window.ENVISION_CMS_CONFIG?.adminHash || CMS_DEFAULT_SHA512;
-  }
-
-  async function verifyPasskey(plaintext) {
-    if (!plaintext) return false;
-    const computed = await hashPasskey(plaintext);
-    const stored = getStoredPasskeyHash();
-    return constantTimeEqual(computed, stored);
-  }
-
-  /**
-   * RFC 6238 Standard Base32 Decoder for Authenticator Apps
-   */
-  function base32Decode(str) {
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    const cleaned = (str || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
-    let bits = '';
-    for (let i = 0; i < cleaned.length; i++) {
-      const val = alphabet.indexOf(cleaned[i]);
-      if (val >= 0) {
-        bits += val.toString(2).padStart(5, '0');
-      }
-    }
-    const bytes = [];
-    for (let i = 0; i + 8 <= bits.length; i += 8) {
-      bytes.push(parseInt(bits.substr(i, 8), 2));
-    }
-    return new Uint8Array(bytes);
-  }
-
-  /**
-   * RFC 6238 TOTP (Time-based One-Time Password) Generator
-   */
-  async function generateTOTPCode(secretBase32, timeOffsetSeconds = 0) {
-    try {
-      const epochSeconds = Math.floor(Date.now() / 1000) + timeOffsetSeconds;
-      const timeStep = 30;
-      const counter = Math.floor(epochSeconds / timeStep);
-
-      const buffer = new ArrayBuffer(8);
-      const view = new DataView(buffer);
-      view.setUint32(0, 0, false);
-      view.setUint32(4, counter, false);
-
-      const rawKey = base32Decode(secretBase32 || getStored2FASecret());
-      if (rawKey.length === 0) return '000000';
-
-      const cryptoKey = await window.crypto.subtle.importKey(
-        'raw',
-        rawKey,
-        { name: 'HMAC', hash: { name: 'SHA-1' } },
-        false,
-        ['sign']
-      );
-
-      const signature = await window.crypto.subtle.sign('HMAC', cryptoKey, buffer);
-      const hmacBytes = new Uint8Array(signature);
-
-      // Dynamic Truncation
-      const offset = hmacBytes[hmacBytes.length - 1] & 0x0f;
-      const code =
-        ((hmacBytes[offset] & 0x7f) << 24) |
-        ((hmacBytes[offset + 1] & 0xff) << 16) |
-        ((hmacBytes[offset + 2] & 0xff) << 8) |
-        (hmacBytes[offset + 3] & 0xff);
-
-      const otp = code % 1000000;
-      return otp.toString().padStart(6, '0');
-    } catch (e) {
-      console.warn('[2FA] WebCrypto TOTP computation error:', e);
-      return '123456';
-    }
-  }
-
-  /**
-   * Verify TOTP 6-Digit Code with Window Clock-Drift Protection
-   */
-  async function verifyTOTPCode(inputCode, secretBase32) {
-    const code = (inputCode || '').trim().replace(/\s+/g, '');
-    if (!code) return false;
-
-    // 1. Check Backup recovery codes
-    const backupCodes = getBackupCodes();
-    const backupIndex = backupCodes.findIndex(bc => constantTimeEqual(bc, code));
-    if (backupIndex !== -1) {
-      backupCodes.splice(backupIndex, 1);
-      localStorage.setItem(CMS_BACKUP_CODES_KEY, JSON.stringify(backupCodes));
-      showToast('Single-use backup recovery code verified and consumed.', 'info');
-      return true;
-    }
-
-    if (code.length !== 6) return false;
-
-    // 2. Check TOTP in current and +/- 30s windows (RFC 6238 tolerance)
-    const secret = secretBase32 || getStored2FASecret();
-    for (const offset of [0, -30, 30]) {
-      try {
-        const expected = await generateTOTPCode(secret, offset);
-        if (constantTimeEqual(code, expected)) {
-          return true;
-        }
-      } catch (e) {}
-    }
-    return false;
-  }
-
-  function getStored2FASecret() {
-    return localStorage.getItem(CMS_2FA_SECRET_KEY) || CMS_DEFAULT_2FA_SECRET;
-  }
-
-  function getBackupCodes() {
-    try {
-      const stored = localStorage.getItem(CMS_BACKUP_CODES_KEY);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {}
-    return [...CMS_DEFAULT_BACKUP_CODES];
-  }
-
-  /**
-   * Ephemeral Signed Session Token Creation & Verification (HMAC-SHA512)
-   */
-  async function createSessionToken() {
-    const payload = {
-      issuedAt: Date.now(),
-      expiresAt: Date.now() + 2 * 60 * 60 * 1000, // 2-hour inactivity auto-expiry
-      nonce: Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('')
-    };
-    const payloadStr = JSON.stringify(payload);
-    const encoder = new TextEncoder();
-    const data = encoder.encode(payloadStr + ':' + CMS_SALT);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-512', data);
-    const signature = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-    return btoa(JSON.stringify({ p: payload, s: signature }));
-  }
-
-  async function verifySessionToken(rawToken) {
-    if (!rawToken) return false;
-    try {
-      const decoded = JSON.parse(atob(rawToken));
-      if (!decoded || !decoded.p || !decoded.s) return false;
-      const { p, s } = decoded;
-
-      // 1. Inactivity & Expiry check
-      if (Date.now() > p.expiresAt) return false;
-
-      // 2. Global Revocation check
-      const revokedBefore = Number(localStorage.getItem(CMS_SESSIONS_REVOKED_KEY) || 0);
-      if (p.issuedAt < revokedBefore) return false;
-
-      // 3. Cryptographic Signature check
-      const encoder = new TextEncoder();
-      const data = encoder.encode(JSON.stringify(p) + ':' + CMS_SALT);
-      const hashBuffer = await window.crypto.subtle.digest('SHA-512', data);
-      const expectedSig = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-      return constantTimeEqual(s, expectedSig);
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /**
-   * Anti-Brute-Force Rate Limiter & Lockout
-   */
-  function getLockoutRemaining() {
-    const lockoutUntil = Number(sessionStorage.getItem(CMS_LOCKOUT_KEY) || 0);
-    if (lockoutUntil > Date.now()) {
-      return Math.ceil((lockoutUntil - Date.now()) / 1000);
-    }
-    return 0;
-  }
-
-  function recordFailedAuth() {
-    let fails = Number(sessionStorage.getItem(CMS_FAILED_ATTEMPTS_KEY) || 0) + 1;
-    sessionStorage.setItem(CMS_FAILED_ATTEMPTS_KEY, String(fails));
-    if (fails >= 5) {
-      const lockoutDuration = 15 * 60 * 1000; // 15-minute freeze
-      sessionStorage.setItem(CMS_LOCKOUT_KEY, String(Date.now() + lockoutDuration));
-      return 15 * 60;
-    }
-    return 0;
-  }
-
-  function resetAuthFails() {
-    sessionStorage.removeItem(CMS_FAILED_ATTEMPTS_KEY);
-    sessionStorage.removeItem(CMS_LOCKOUT_KEY);
-  }
-
   // ==========================================================================
-  // Step 1: Admin Passkey Authentication Modal
+  // Step 1: Admin Authentication Modal
   // ==========================================================================
 
   function openLoginModal() {
-    const lockoutSecs = getLockoutRemaining();
-    if (lockoutSecs > 0) {
-      alert(`⚠️ Authentication locked due to excessive failed attempts. Please try again in ${Math.ceil(lockoutSecs / 60)} minute(s).`);
+    if (!window.supabaseClient) {
+      alert('CMS access is unavailable until the trusted Supabase authentication backend is configured.');
       return;
     }
 
     const backdrop = document.createElement('div');
     backdrop.className = 'cms-modal-backdrop open';
     backdrop.innerHTML = `
-      <div class="cms-modal-box" style="width: min(420px, 94vw);">
+      <div class="cms-modal-box" style="width: min(440px, 94vw);">
         <div class="cms-modal-header">
-          <h3 class="cms-modal-title"><i class="fa-solid fa-lock" style="color: var(--wp-accent);"></i> Step 1 of 2: Admin Passkey</h3>
+          <h3 class="cms-modal-title"><i class="fa-solid fa-lock" style="color: var(--wp-accent);"></i> Admin Authentication</h3>
           <button type="button" class="cms-modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form id="wp-login-form">
+
+        <form id="wp-supabase-form">
           <div class="wp-panel-group">
-            <label class="wp-control-label" style="display:block; margin-bottom: 6px;">Enter Master Admin Passkey:</label>
-            <input type="password" id="wp-passkey-input" class="wp-input" style="width:100%; font-size:14px; padding:10px;" placeholder="Enter passkey (envision@2026)" required autofocus autocomplete="current-password" />
+            <label class="wp-control-label" style="display:block; margin-bottom: 6px;">Admin Email:</label>
+            <input type="email" id="wp-supabase-email" class="wp-input" style="width:100%; font-size:14px; padding:10px; margin-bottom:10px;" placeholder="admin@envision.iimbg.ac.in" required autocomplete="username" />
+            <label class="wp-control-label" style="display:block; margin-bottom: 6px;">Password:</label>
+            <input type="password" id="wp-supabase-password" class="wp-input" style="width:100%; font-size:14px; padding:10px;" placeholder="Enter password" required autocomplete="current-password" />
             <div style="font-size:11.5px; color:#64748b; margin-top:8px; display:flex; align-items:center; gap:5px;">
-              <i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Salted SHA-512 Cryptographic Verification
+              <i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Authenticated via Supabase Cloud JWT
+            </div>
+            <div id="wp-mfa-step" style="display:none; margin-top:14px;">
+              <label class="wp-control-label" style="display:block; margin-bottom:6px;">Authenticator code:</label>
+              <input type="text" id="wp-supabase-mfa-code" class="wp-input" style="width:100%; font-size:16px; padding:10px; letter-spacing:4px;" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,}" maxlength="7" placeholder="123456" />
+              <div style="font-size:11.5px; color:#64748b; margin-top:8px;">
+                Enter the current 6-digit code from your enrolled authenticator app.
+              </div>
             </div>
           </div>
           <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top:16px;">
             <button type="button" class="wp-bar-btn wp-modal-cancel" style="background:#f1f5f9; color:#475569;">Cancel</button>
-            <button type="submit" class="wp-bar-btn btn-publish" style="padding:8px 18px; font-size:13px;"><i class="fa-solid fa-arrow-right"></i> Continue to 2FA</button>
+            <button type="submit" class="wp-bar-btn btn-publish" id="wp-supabase-submit" style="padding:8px 18px; font-size:13px;"><i class="fa-solid fa-cloud"></i> Sign In</button>
           </div>
         </form>
       </div>
     `;
 
-    backdrop.querySelector('.cms-modal-close').onclick = () => backdrop.remove();
-    backdrop.querySelector('.wp-modal-cancel').onclick = () => backdrop.remove();
-
-    backdrop.querySelector('#wp-login-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const inputVal = document.getElementById('wp-passkey-input').value.trim();
-
-      // Check lockout status
-      const lock = getLockoutRemaining();
-      if (lock > 0) {
-        alert(`Account locked. Please wait ${Math.ceil(lock / 60)} minute(s).`);
-        return;
-      }
-
-      // Verify passkey cryptographically
-      const isPasskeyValid = await verifyPasskey(inputVal);
-
-      if (isPasskeyValid) {
-        resetAuthFails();
-        backdrop.remove();
-
-        // Always proceed to Google-Style 2-Step Verification
-        open2FAModal();
-      } else {
-        const lockoutDuration = recordFailedAuth();
-        const fails = Number(sessionStorage.getItem(CMS_FAILED_ATTEMPTS_KEY) || 1);
-        if (lockoutDuration > 0) {
-          backdrop.remove();
-          alert('🚨 Too many invalid attempts! Administrative access locked for 15 minutes to protect against brute-force attacks.');
-        } else {
-          alert(`❌ Invalid admin passkey! Attempt ${fails} of 5 before temporary lockout.`);
-        }
-      }
-    };
-
-    document.body.append(backdrop);
-  }
-
-  // ==========================================================================
-  // Step 2: Google-Style 2-Step Verification Modal
-  // ==========================================================================
-
-  function open2FAModal() {
-    const currentSecret = getStored2FASecret();
-    const backupCodes = getBackupCodes();
-
-    const backdrop = document.createElement('div');
-    backdrop.className = 'cms-modal-backdrop open';
-    backdrop.innerHTML = `
-      <div class="cms-modal-box cms-2fa-modal-box">
-        <div class="cms-2fa-header">
-          <div class="cms-2fa-shield-wrap">
-            <i class="fa-solid fa-shield-halved"></i>
-          </div>
-          <h3 class="cms-2fa-title">2-Step Verification</h3>
-          <p class="cms-2fa-subtitle">To help protect your administrative workspace, confirm it's really you.</p>
-          <div class="cms-2fa-account-chip">
-            <div class="cms-2fa-avatar">E</div>
-            <span>Envision Admin • admin@envision.iimbg.ac.in</span>
-          </div>
-        </div>
-
-        <!-- Verification Method Tabs -->
-        <div class="cms-2fa-methods">
-          <button type="button" class="cms-2fa-method-tab active" data-tab="totp">
-            <i class="fa-solid fa-mobile-screen-button"></i> Authenticator App
-          </button>
-          <button type="button" class="cms-2fa-method-tab" data-tab="backup">
-            <i class="fa-solid fa-key"></i> Backup Code
-          </button>
-        </div>
-
-        <!-- 1. TOTP Tab (Google Authenticator) -->
-        <div id="cms-2fa-tab-totp" class="cms-2fa-tab-pane">
-          <p style="font-size:13px; color:#3c4043; text-align:center; margin:0 0 14px;">
-            Enter the 6-digit code from <strong>Google Authenticator</strong>, Microsoft Authenticator, or 1Password.
-          </p>
-
-          <form id="cms-2fa-totp-form">
-            <!-- 6 Digit Inputs -->
-            <div class="cms-2fa-digits-container" id="cms-2fa-boxes">
-              <input type="text" maxlength="1" class="cms-2fa-digit-input" data-index="0" autofocus inputmode="numeric" autocomplete="one-time-code" />
-              <input type="text" maxlength="1" class="cms-2fa-digit-input" data-index="1" inputmode="numeric" />
-              <input type="text" maxlength="1" class="cms-2fa-digit-input" data-index="2" inputmode="numeric" />
-              <input type="text" maxlength="1" class="cms-2fa-digit-input" data-index="3" inputmode="numeric" />
-              <input type="text" maxlength="1" class="cms-2fa-digit-input" data-index="4" inputmode="numeric" />
-              <input type="text" maxlength="1" class="cms-2fa-digit-input" data-index="5" inputmode="numeric" />
-            </div>
-
-            <!-- Timer -->
-            <div class="cms-2fa-timer-row" style="justify-content:center;">
-              <span class="cms-2fa-timer-badge" id="cms-2fa-timer-display">
-                <i class="fa-solid fa-clock-rotate-left"></i> Code rotates in <strong id="cms-2fa-seconds">30</strong>s
-              </span>
-            </div>
-
-            <!-- Email Passkey Request Card -->
-            <div class="cms-2fa-email-request-card" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:18px; text-align:center;">
-              <div style="font-size:12px; color:#475569; margin-bottom:10px; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <i class="fa-solid fa-envelope" style="color:#1a73e8; font-size:14px;"></i>
-                <span>Need your Google Passkey or Verification OTP?</span>
-              </div>
-              <button type="button" class="cms-2fa-email-btn" id="cms-2fa-send-email-btn" style="background:#ffffff; border:1.5px solid #1a73e8; color:#1a73e8; border-radius:8px; padding:8px 16px; font-size:12.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:all 0.2s;">
-                <i class="fa-solid fa-paper-plane"></i> Get Google Passkey via Email
-              </button>
-              <div id="cms-2fa-email-status" style="display:none; font-size:11.5px; color:#10b981; font-weight:600; margin-top:8px;"></div>
-            </div>
-
-            <!-- Actions -->
-            <div class="cms-2fa-actions" style="margin-top:16px;">
-              <button type="button" class="cms-2fa-btn-secondary" id="cms-2fa-cancel-btn">Cancel</button>
-              <button type="submit" class="cms-2fa-btn-primary" id="cms-2fa-verify-btn">
-                <i class="fa-solid fa-check"></i> Verify &amp; Enter Studio
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- 2. Backup Code Tab -->
-        <div id="cms-2fa-tab-backup" class="cms-2fa-tab-pane" style="display:none;">
-          <p style="font-size:13px; color:#3c4043; margin:0 0 14px;">
-            Enter one of your 8-character single-use emergency backup recovery codes:
-          </p>
-          <form id="cms-2fa-backup-form">
-            <div class="wp-panel-group">
-              <input type="text" id="cms-2fa-backup-input" class="wp-input" style="width:100%; font-size:15px; font-family:monospace; padding:10px;" placeholder="ENV-9842-SEC" required />
-            </div>
-            <div style="font-size:11.5px; color:#64748b; margin:8px 0 16px;">
-              Remaining active recovery codes: <strong>${backupCodes.length}</strong>
-            </div>
-            <div class="cms-2fa-actions">
-              <button type="button" class="cms-2fa-btn-secondary" id="cms-2fa-backup-cancel-btn">Back</button>
-              <button type="submit" class="cms-2fa-btn-primary">
-                <i class="fa-solid fa-key"></i> Verify Backup Code
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    `;
-
-    document.body.append(backdrop);
-
-    // Cancel buttons
-    backdrop.querySelector('#cms-2fa-cancel-btn').onclick = () => backdrop.remove();
-    backdrop.querySelector('#cms-2fa-backup-cancel-btn').onclick = () => {
-      backdrop.querySelectorAll('.cms-2fa-tab-pane').forEach(p => p.style.display = 'none');
-      backdrop.querySelector('#cms-2fa-tab-totp').style.display = 'block';
-      backdrop.querySelectorAll('.cms-2fa-method-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === 'totp'));
-    };
-
-    // Tab switching
-    backdrop.querySelectorAll('.cms-2fa-method-tab').forEach((tabBtn) => {
-      tabBtn.onclick = () => {
-        backdrop.querySelectorAll('.cms-2fa-method-tab').forEach(b => b.classList.remove('active'));
-        tabBtn.classList.add('active');
-        const tab = tabBtn.getAttribute('data-tab');
-        backdrop.querySelectorAll('.cms-2fa-tab-pane').forEach(p => p.style.display = 'none');
-        backdrop.querySelector(`#cms-2fa-tab-${tab}`).style.display = 'block';
-      };
+    backdrop.querySelectorAll('.cms-modal-close, .wp-modal-cancel').forEach(btn => {
+      btn.onclick = () => backdrop.remove();
     });
 
-    // Send Passkey to Email handler
-    const emailBtn = backdrop.querySelector('#cms-2fa-send-email-btn');
-    const emailStatus = backdrop.querySelector('#cms-2fa-email-status');
-    const adminEmail = 'srivastavavasu111@gmail.com';
+    const supabaseForm = backdrop.querySelector('#wp-supabase-form');
 
-    if (emailBtn) {
-      emailBtn.onclick = async () => {
-        emailBtn.disabled = true;
-        emailBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Dispatching Passkey to Email...';
+    if (supabaseForm) {
+      supabaseForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('wp-supabase-email').value.trim();
+        const password = document.getElementById('wp-supabase-password').value;
+        const mfaStep = backdrop.querySelector('#wp-mfa-step');
+        const mfaCode = backdrop.querySelector('#wp-supabase-mfa-code');
+        const submitButton = backdrop.querySelector('#wp-supabase-submit');
 
         try {
-          const liveOtp = await generateTOTPCode(currentSecret);
-          const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-
-          const emailData = {
-            _subject: '🔒 [Envision Security Alert] Master Admin Passkey & Google 2FA Verification Code',
-            _captcha: 'false',
-            _template: 'table',
-            recipient: adminEmail,
-            email: adminEmail,
-            Master_Admin_Passkey: 'envision@2026',
-            Current_Live_2FA_Code: liveOtp,
-            Google_Authenticator_Secret_Key: currentSecret,
-            Requested_At: timestamp,
-            System_Origin: 'Envision Visual Studio (IIM Bodh Gaya)'
-          };
-
-          // Gateway 1: FormSubmit AJAX API
-          fetch(`https://formsubmit.co/ajax/${adminEmail}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify(emailData)
-          }).catch(() => {});
-
-          // Gateway 2: Hidden Iframe Background Form Post (Bypasses CORS filters)
-          try {
-            const hiddenFrame = document.createElement('iframe');
-            hiddenFrame.name = 'cms_email_frame';
-            hiddenFrame.style.display = 'none';
-            document.body.append(hiddenFrame);
-
-            const hiddenForm = document.createElement('form');
-            hiddenForm.method = 'POST';
-            hiddenForm.action = `https://formsubmit.co/${adminEmail}`;
-            hiddenForm.target = 'cms_email_frame';
-            hiddenForm.style.display = 'none';
-
-            Object.keys(emailData).forEach(k => {
-              const inp = document.createElement('input');
-              inp.type = 'hidden';
-              inp.name = k;
-              inp.value = emailData[k];
-              hiddenForm.append(inp);
-            });
-
-            document.body.append(hiddenForm);
-            hiddenForm.submit();
-            setTimeout(() => {
-              hiddenForm.remove();
-              hiddenFrame.remove();
-            }, 3000);
-          } catch (frameErr) {}
-
-          // Automatically copy 6-digit OTP to clipboard for instant convenience
-          try {
-            navigator.clipboard.writeText(liveOtp);
-          } catch (clipErr) {}
-
-          // Enable Resend Button with Cooldown
-          let resendCooldown = 10;
-          emailBtn.disabled = true;
-          emailBtn.innerHTML = `<i class="fa-solid fa-arrows-rotate fa-spin" style="color:#10b981;"></i> Dispatched! Resend in ${resendCooldown}s`;
-          emailBtn.style.borderColor = '#10b981';
-          emailBtn.style.color = '#10b981';
-
-          const cooldownInterval = setInterval(() => {
-            resendCooldown--;
-            if (resendCooldown > 0) {
-              emailBtn.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i> Resend code in ${resendCooldown}s`;
-            } else {
-              clearInterval(cooldownInterval);
-              emailBtn.disabled = false;
-              emailBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Resend Passkey to Email';
-              emailBtn.style.borderColor = '#1a73e8';
-              emailBtn.style.color = '#1a73e8';
+          submitButton.disabled = true;
+          if (mfaStep.style.display === 'block') {
+            if (!mfaCode.value.trim()) {
+              throw new Error('Enter the authenticator code to continue.');
             }
-          }, 1000);
+            const session = await completeMfaChallenge(
+              (await window.supabaseClient.auth.getSession()).data.session,
+              mfaCode.value
+            );
+            const authorizedSession = await getAuthorizedSession();
+            if (!authorizedSession) {
+              throw new Error('MFA verification succeeded, but this account is not authorized to publish.');
+            }
+            backdrop.remove();
+            await grantAuthenticatedAccess(session || authorizedSession);
+            showToast('Signed in with MFA. Studio unlocked successfully!', 'success');
+          } else {
+            const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) throw error;
 
-          if (emailStatus) {
-            emailStatus.style.display = 'block';
-            emailStatus.innerHTML = `
-              <div style="margin-top:8px; line-height:1.45; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:10px;">
-                <div style="color:#10b981; font-weight:700; font-size:12px;">
-                  <i class="fa-solid fa-circle-check"></i> Dispatched to ${adminEmail}!
-                </div>
-                <div style="font-size:11px; color:#64748b; margin:3px 0 8px;">
-                  (Check <strong>Spam / Promotions</strong> folder if not in inbox)
-                </div>
-
-                <!-- Instant Backup OTP Display -->
-                <div style="background:#f1f5f9; border-radius:6px; padding:8px 10px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                  <span style="font-size:11px; font-weight:700; color:#334155;">Active OTP Code:</span>
-                  <span style="font-family:monospace; font-size:15px; font-weight:800; color:#0f172a; letter-spacing:0.08em;">${liveOtp}</span>
-                  <button type="button" id="cms-2fa-instant-fill-btn" style="background:#1a73e8; color:#fff; border:0; border-radius:4px; padding:3px 8px; font-size:11px; font-weight:600; cursor:pointer;">
-                    Insert Code
-                  </button>
-                </div>
-
-                <div style="display:flex; align-items:center; justify-content:center; gap:12px; font-size:11.5px;">
-                  <button type="button" id="cms-2fa-direct-resend-link" style="background:none; border:none; color:#1a73e8; font-weight:700; text-decoration:underline; cursor:pointer;">
-                    <i class="fa-solid fa-arrows-rotate"></i> Resend Email
-                  </button>
-                  <span style="color:#cbd5e1;">•</span>
-                  <a href="mailto:${adminEmail}?subject=Envision%20Security%20Passkey&body=Master%20Passkey:%20envision@2026%0ALive%20OTP:%20${liveOtp}" style="color:#1a73e8; font-weight:600; text-decoration:underline;">
-                    Open in Mail
-                  </a>
-                </div>
-              </div>
-            `;
-
-            // Insert code button
-            const fillBtn = backdrop.querySelector('#cms-2fa-instant-fill-btn');
-            if (fillBtn) {
-              fillBtn.onclick = () => {
-                for (let i = 0; i < 6; i++) {
-                  digitInputs[i].value = liveOtp[i];
-                  digitInputs[i].classList.add('filled');
-                }
-                showToast(`Live OTP ${liveOtp} inserted!`, 'info');
-                setTimeout(() => submit2FACode(liveOtp), 200);
-              };
+            let assurance = null;
+            if (window.supabaseClient.auth.mfa?.getAuthenticatorAssuranceLevel) {
+              const { data: assuranceData, error: assuranceError } =
+                await window.supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+              if (assuranceError) throw assuranceError;
+              assurance = assuranceData;
             }
 
-            // Direct resend link
-            const directResendLink = backdrop.querySelector('#cms-2fa-direct-resend-link');
-            if (directResendLink) {
-              directResendLink.onclick = () => {
-                clearInterval(cooldownInterval);
-                emailBtn.click();
-              };
+            if (assurance && assurance.currentLevel !== 'aal2' && assurance.nextLevel === 'aal2') {
+              mfaStep.style.display = 'block';
+              submitButton.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Verify MFA';
+              mfaCode.required = true;
+              mfaCode.focus();
+              showToast('Password accepted. Complete MFA to enable publishing.', 'success');
+              return;
             }
+
+            const session = await getAuthorizedSession();
+            if (!session) {
+              const role = data.session?.user?.app_metadata?.role;
+              if (role !== 'admin') {
+                throw new Error('Access denied. Administrator account required.');
+              }
+              throw new Error('This admin account requires a verified MFA session before publishing.');
+            }
+            backdrop.remove();
+            await grantAuthenticatedAccess(session || data.session);
+            showToast(`Signed in to Supabase as ${data.user.email}!`, 'success');
           }
-          showToast(`Passkey & OTP code sent to ${adminEmail}!`, 'success');
         } catch (err) {
-          console.warn('[2FA Email Error]', err);
-          emailBtn.disabled = false;
-          emailBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Resend Passkey via Email';
-          showToast(`Passkey dispatched to ${adminEmail}`, 'info');
+          alert('Supabase login error: ' + (err.message || 'Authentication failed.'));
+        } finally {
+          submitButton.disabled = false;
         }
       };
     }
 
-    // 6 Digit Box Interactions
-    const digitInputs = backdrop.querySelectorAll('.cms-2fa-digit-input');
-    
-    digitInputs.forEach((input, idx) => {
-      input.addEventListener('input', (e) => {
-        const val = e.target.value.replace(/[^0-9]/g, '');
-        e.target.value = val ? val[0] : '';
-        e.target.classList.toggle('filled', !!e.target.value);
+    document.body.append(backdrop);
+  }
 
-        if (e.target.value && idx < digitInputs.length - 1) {
-          digitInputs[idx + 1].focus();
-        }
-
-        // Auto-submit if all 6 boxes are filled
-        const fullCode = Array.from(digitInputs).map(i => i.value).join('');
-        if (fullCode.length === 6) {
-          submit2FACode(fullCode);
-        }
-      });
-
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !input.value && idx > 0) {
-          digitInputs[idx - 1].focus();
-        }
-      });
-
-      // Handle paste of full 6-digit code
-      input.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
-        if (pasteData) {
-          for (let i = 0; i < digitInputs.length; i++) {
-            if (i < pasteData.length) {
-              digitInputs[i].value = pasteData[i];
-              digitInputs[i].classList.add('filled');
-            }
-          }
-          if (pasteData.length >= 6) {
-            submit2FACode(pasteData.substr(0, 6));
-          } else {
-            digitInputs[Math.min(pasteData.length, 5)].focus();
-          }
-        }
-      });
-    });
-
-    // Live TOTP countdown timer
-    let timerInterval = setInterval(updateTimerDisplay, 1000);
-    function updateTimerDisplay() {
-      const remainingSecs = 30 - (Math.floor(Date.now() / 1000) % 30);
-      const secEl = backdrop.querySelector('#cms-2fa-seconds');
-      if (secEl) secEl.textContent = remainingSecs;
-    }
-    updateTimerDisplay();
-
-    // Backup code form submission
-    backdrop.querySelector('#cms-2fa-backup-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const code = backdrop.querySelector('#cms-2fa-backup-input').value.trim();
-      const isValid = await verifyTOTPCode(code, currentSecret);
-      if (isValid) {
-        clearInterval(timerInterval);
-        backdrop.remove();
-        await grantAuthenticatedAccess();
-      } else {
-        alert('Invalid emergency backup recovery code.');
-      }
-    };
-
-    // TOTP form submission
-    backdrop.querySelector('#cms-2fa-totp-form').onsubmit = (e) => {
-      e.preventDefault();
-      const fullCode = Array.from(digitInputs).map(i => i.value).join('');
-      submit2FACode(fullCode);
-    };
-
-    async function submit2FACode(code) {
-      if (code.length !== 6) {
-        alert('Please enter all 6 digits of your verification code.');
-        return;
-      }
-
-      const isValid = await verifyTOTPCode(code, currentSecret);
-      if (isValid) {
-        clearInterval(timerInterval);
-        backdrop.remove();
-        await grantAuthenticatedAccess();
-      } else {
-        alert('❌ Invalid 6-digit verification code. Please check your Authenticator app and try again.');
-        digitInputs.forEach(i => { i.value = ''; i.classList.remove('filled'); });
-        digitInputs[0].focus();
-      }
-    }
-
-    async function grantAuthenticatedAccess() {
-      const token = await createSessionToken();
-      sessionStorage.setItem(CMS_AUTH_KEY, token);
-      document.getElementById('wp-admin-bar')?.classList.remove('cms-hidden');
-      document.body.classList.add('cms-logged-in');
-      setEditMode(true);
-      showToast('2-Step Verification Successful! Studio Unlocked.', 'success');
-    }
+  async function grantAuthenticatedAccess(session) {
+    if (!session || !session.user || !(await getAuthorizedSession())) return;
+    document.getElementById('wp-admin-bar')?.classList.remove('cms-hidden');
+    document.body.classList.add('cms-logged-in');
+    setEditMode(true);
+    showToast('Studio Unlocked successfully!', 'success');
   }
 
   // ==========================================================================
-  // Step 3: Security & 2FA Vault Modal (CERT-In Compliance Dashboard)
+  // Step 2: Security Vault Modal (Passkey & Session Security)
   // ==========================================================================
 
   function openSecurityVaultModal() {
-    const currentSecret = getStored2FASecret();
-    const backupCodes = getBackupCodes();
-
     const backdrop = document.createElement('div');
     backdrop.className = 'cms-modal-backdrop open';
     backdrop.innerHTML = `
       <div class="cms-modal-box cms-vault-modal-box">
         <div class="cms-modal-header">
-          <h3 class="cms-modal-title"><i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Security Vault &amp; CERT-In Compliance</h3>
+          <h3 class="cms-modal-title"><i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Security Vault &amp; Passkey Management</h3>
           <button type="button" class="cms-modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         <!-- Compliance Score Banner -->
         <div class="cms-vault-score-banner">
           <div>
-            <h4 class="cms-vault-score-title"><i class="fa-solid fa-award"></i> CERT-In &amp; OWASP Audit Score: Grade A+</h4>
-            <p class="cms-vault-score-desc">Zero plaintext credentials, salted SHA-512 cryptographic hashing, TOTP 2FA, and signed session integrity active.</p>
+            <h4 class="cms-vault-score-title"><i class="fa-solid fa-award"></i> Security Level: Grade A+</h4>
+            <p class="cms-vault-score-desc">Authentication, authorization, session expiry, and lockout enforcement are delegated to the configured Supabase project.</p>
           </div>
           <div class="cms-vault-score-badge">100%</div>
         </div>
@@ -4486,61 +4240,25 @@
           <div class="cms-vault-item">
             <i class="fa-solid fa-circle-check"></i>
             <div>
-              <div class="cms-vault-item-title">Two-Factor Authentication (Mandatory on Every Login)</div>
-              <div class="cms-vault-item-desc">Requires RFC 6238 TOTP verification from Google Authenticator on every login.</div>
+              <div class="cms-vault-item-title">Trusted Authentication Backend</div>
+              <div class="cms-vault-item-desc">Browser-local passkeys and browser-generated session tokens are disabled.</div>
             </div>
           </div>
           <div class="cms-vault-item">
             <i class="fa-solid fa-circle-check"></i>
             <div>
-              <div class="cms-vault-item-title">Cryptographic Passkey Storage (Salted SHA-512)</div>
-              <div class="cms-vault-item-desc">Passkeys are hashed with a 128-bit isolated salt and verified in constant time.</div>
+              <div class="cms-vault-item-title">Server-Enforced Lockout &amp; MFA</div>
+              <div class="cms-vault-item-desc">Configure Supabase Auth MFA and provider-side rate limits before enabling administration.</div>
             </div>
           </div>
           <div class="cms-vault-item">
             <i class="fa-solid fa-circle-check"></i>
             <div>
-              <div class="cms-vault-item-title">Anti-Brute-Force &amp; 15-Minute Lockout</div>
-              <div class="cms-vault-item-desc">Locks authentication after 5 consecutive failed attempts.</div>
-            </div>
-          </div>
-          <div class="cms-vault-item">
-            <i class="fa-solid fa-circle-check"></i>
-            <div>
-              <div class="cms-vault-item-title">HMAC Ephemeral Signed Sessions (2-Hour Auto-Expiry)</div>
-              <div class="cms-vault-item-desc">Cryptographically signed tamper-proof tokens prevent replay attacks.</div>
+              <div class="cms-vault-item-title">Server-Managed Sessions</div>
+              <div class="cms-vault-item-desc">Session validity is checked through the Supabase Auth session and admin role.</div>
             </div>
           </div>
         </div>
-
-        <!-- 2FA Configuration -->
-        <div class="wp-panel-group" style="margin-bottom:16px;">
-          <div class="wp-panel-heading"><i class="fa-solid fa-mobile-screen"></i> 2-Factor Authentication Management</div>
-          <div class="wp-control-row">
-            <span class="wp-control-label">Current 2FA Base32 Secret:</span>
-            <code style="font-size:13px; font-weight:700; color:#0f172a;">${currentSecret}</code>
-          </div>
-          <div class="wp-control-row">
-            <span class="wp-control-label">Policy:</span>
-            <span style="font-size:12px; font-weight:600; color:#10b981;">
-              ● Strict 2-Step Verification Required on Every Login
-            </span>
-          </div>
-          <div style="display:flex; gap:10px; margin-top:10px;">
-            <button type="button" class="wp-bar-btn" id="cms-vault-rotate-2fa-btn" style="background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1;">
-              <i class="fa-solid fa-arrows-rotate"></i> Rotate 2FA Secret Key
-            </button>
-          </div>
-        </div>
-
-        <!-- Change Master Passkey -->
-        <form id="cms-vault-passkey-form" class="wp-panel-group" style="margin-bottom:16px;">
-          <div class="wp-panel-heading"><i class="fa-solid fa-key"></i> Rotate Admin Passkey</div>
-          <div style="display:flex; gap:10px; align-items:center;">
-            <input type="password" id="cms-vault-new-passkey" class="wp-input" style="flex:1;" placeholder="Enter new strong passkey" minlength="8" required />
-            <button type="submit" class="wp-bar-btn btn-publish" style="white-space:nowrap;"><i class="fa-solid fa-lock"></i> Update &amp; Hash</button>
-          </div>
-        </form>
 
         <!-- Global Session Invalidation -->
         <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e2e8f0; padding-top:16px;">
@@ -4555,23 +4273,10 @@
     backdrop.querySelector('.cms-modal-close').onclick = () => backdrop.remove();
     backdrop.querySelector('.wp-modal-cancel').onclick = () => backdrop.remove();
 
-    // Rotate 2FA Secret Key
-    backdrop.querySelector('#cms-vault-rotate-2fa-btn').onclick = () => {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-      let newSecret = '';
-      for (let i = 0; i < 16; i++) {
-        newSecret += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      localStorage.setItem(CMS_2FA_SECRET_KEY, newSecret);
-      showToast(`2FA Secret Rotated to: ${newSecret}. Please re-pair your Google Authenticator app.`, 'success');
-      backdrop.remove();
-    };
-
     // Invalidate all active sessions
-    backdrop.querySelector('#cms-vault-revoke-all-btn').onclick = () => {
+    backdrop.querySelector('#cms-vault-revoke-all-btn').onclick = async () => {
       if (confirm('Are you sure you want to invalidate all active administrative sessions globally? You will need to log in again.')) {
-        localStorage.setItem(CMS_SESSIONS_REVOKED_KEY, String(Date.now()));
-        sessionStorage.removeItem(CMS_AUTH_KEY);
+        await window.supabaseClient?.auth.signOut();
         setEditMode(false);
         document.getElementById('wp-admin-bar')?.classList.add('cms-hidden');
         document.body.classList.remove('cms-logged-in');
@@ -4580,33 +4285,15 @@
       }
     };
 
-    // Change master passkey
-    backdrop.querySelector('#cms-vault-passkey-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const newKey = backdrop.querySelector('#cms-vault-new-passkey').value.trim();
-      if (newKey.length < 8) {
-        alert('Passkey must be at least 8 characters long.');
-        return;
-      }
-      const newHash = await hashPasskey(newKey);
-      localStorage.setItem(CMS_HASH_KEY, newHash);
-      showToast('Admin passkey successfully updated and cryptographically hashed with SHA-512!', 'success');
-      backdrop.remove();
-    };
-
     document.body.append(backdrop);
   }
 
   async function checkAuthSession() {
-    const rawToken = sessionStorage.getItem(CMS_AUTH_KEY);
-    if (!rawToken) return;
-
-    const isValid = await verifySessionToken(rawToken);
-    if (isValid) {
+    const session = await getAuthorizedSession();
+    if (session) {
       document.getElementById('wp-admin-bar')?.classList.remove('cms-hidden');
       document.body.classList.add('cms-logged-in');
     } else {
-      sessionStorage.removeItem(CMS_AUTH_KEY);
       setEditMode(false);
       document.getElementById('wp-admin-bar')?.classList.add('cms-hidden');
       document.body.classList.remove('cms-logged-in');
@@ -4614,7 +4301,9 @@
   }
 
   function logoutAdmin() {
-    sessionStorage.removeItem(CMS_AUTH_KEY);
+    if (window.supabaseClient) {
+      window.supabaseClient.auth.signOut();
+    }
     setEditMode(false);
     document.getElementById('wp-admin-bar')?.classList.add('cms-hidden');
     document.body.classList.remove('cms-logged-in');
@@ -4625,9 +4314,8 @@
     window.addEventListener('keydown', async (e) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
         e.preventDefault();
-        const rawToken = sessionStorage.getItem(CMS_AUTH_KEY);
-        const isValid = rawToken ? await verifySessionToken(rawToken) : false;
-        if (isValid) {
+        const session = await getAuthorizedSession();
+        if (session) {
           setEditMode(!isEditMode);
         } else {
           openLoginModal();
@@ -4640,14 +4328,24 @@
   // 13. Save, Export & Toast Helper
   // ==========================================================================
 
-  function saveAllChanges() {
+  async function saveAllChanges() {
+    if (!window.supabaseClient) {
+      showToast('Supabase is still loading. Wait a moment and try publishing again.', 'error');
+      return;
+    }
+
+    const session = await getAuthorizedSession();
+    if (!session) {
+      showToast('Publishing requires an authorized Supabase administrator session.', 'error');
+      await checkAuthSession();
+      return;
+    }
+
     // 1. Save all dynamic cards and grids
     const gridMap = {};
     document.querySelectorAll('[data-cms-grid-id]').forEach((grid) => {
       const gridId = grid.getAttribute('data-cms-grid-id');
-      const clone = grid.cloneNode(true);
-      clone.querySelectorAll('.wp-card-toolbar, .wp-add-card-placeholder').forEach(el => el.remove());
-      gridMap[gridId] = clone.innerHTML;
+      gridMap[gridId] = sanitizeHtml(getCleanElementHtml(grid));
     });
     localStorage.setItem(gridStorageKey, JSON.stringify(gridMap));
 
@@ -4664,31 +4362,90 @@
       if (el.tagName === 'IMG') {
         pageContentMap[id] = {
           type: 'image',
-          src: el.src,
+          src: el.getAttribute('src') || el.src,
           alt: el.alt || '',
           style: elStyle
         };
       } else {
-        pageContentMap[id] = {
+        const itemObj = {
           type: 'text',
-          html: el.innerHTML,
+          html: sanitizeHtml(getCleanElementHtml(el)),
           style: elStyle
         };
+        if (el.tagName === 'A' || el.hasAttribute('href')) {
+          itemObj.href = el.getAttribute('href') || '';
+          if (el.getAttribute('target')) itemObj.target = el.getAttribute('target');
+        }
+        pageContentMap[id] = itemObj;
       }
     });
 
-    // 3. Save Hero Photo/Video & Coverage settings
+    // 3. Save Hero Photo/Video & Coverage settings (F1)
     if (pageHeroSettings) {
       localStorage.setItem(heroStorageKey, JSON.stringify(pageHeroSettings));
+      pageContentMap['_hero'] = { type: 'hero', data: pageHeroSettings };
     }
+
+    // 4. Save Navigation Menu (F1)
+    try {
+      const storedNav = localStorage.getItem(CMS_NAV_KEY);
+      if (storedNav) {
+        const parsedNav = JSON.parse(storedNav);
+        if (Array.isArray(parsedNav)) {
+          globalStyles['_nav'] = parsedNav;
+        }
+      }
+    } catch (e) {}
 
     try {
       localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
       const pubBtn = document.getElementById('wp-publish-btn');
       if (pubBtn) {
+        pubBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Publishing...';
+      }
+
+      const payload = {
+        page_path: pagePath,
+        content_data: pageContentMap,
+        grid_data: gridMap,
+        global_styles: globalStyles,
+        updated_at: new Date().toISOString(),
+        updated_by: session.user?.id || null
+      };
+      const { error } = await window.supabaseClient
+        .from('site_content')
+        .upsert(payload, { onConflict: 'page_path' });
+
+      if (error) {
+        console.error('[Supabase] Database publish failed:', error);
+        if (pubBtn) pubBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Publish Failed';
+        const requiresMfa = /row-level security|permission denied|42501/i.test(error.message || '');
+        showToast(
+          requiresMfa
+            ? 'Publish blocked by Supabase security policy. Sign in with the required admin MFA session.'
+            : `Publish failed: ${error.message || 'Supabase rejected the update.'}`,
+          'error'
+        );
+        return;
+      }
+
+      // Also sync global styles and navigation to shared _global row so changes apply across all site pages
+      const globalPayload = {
+        page_path: '_global',
+        content_data: {},
+        grid_data: {},
+        global_styles: globalStyles,
+        updated_at: new Date().toISOString(),
+        updated_by: session.user?.id || null
+      };
+      await window.supabaseClient
+        .from('site_content')
+        .upsert(globalPayload, { onConflict: 'page_path' });
+
+      if (pubBtn) {
         pubBtn.innerHTML = '<i class="fa-solid fa-check"></i> Published Live';
       }
-      showToast('All changes & Hero media saved and published live!', 'success');
+      showToast('All changes & Hero media saved and published live to Supabase!', 'success');
     } catch (err) {
       showToast('Save error: ' + err.message, 'error');
     }
@@ -4696,7 +4453,7 @@
 
   function exportPageHTML() {
     const clone = document.documentElement.cloneNode(true);
-    clone.querySelectorAll('#wp-admin-bar, #wp-word-ribbon, #wp-floating-toolbar, #wp-sidebar-inspector, #cms-trigger-btn, .cms-modal-backdrop, .cms-toast, .wp-section-bar, .wp-add-section-divider, .wp-nav-add-btn, .wp-card-toolbar, .wp-add-card-placeholder, .wp-hero-edit-pill, .wp-card-media-pill, .cms-element-move-pill, .cms-relocate-popover, .cms-drop-indicator-line').forEach(el => el.remove());
+    clone.querySelectorAll(CMS_UI_SELECTOR).forEach(el => el.remove());
     clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
     clone.querySelectorAll('[data-cms-relocatable]').forEach(el => el.removeAttribute('data-cms-relocatable'));
     clone.querySelectorAll('[data-cms-offset-x]').forEach(el => {

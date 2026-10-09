@@ -1,10 +1,11 @@
 User-agent: *
 Allow: /
-
-# Disallow error pages from indexing
-Disallow: /404.html
-Disallow: /500.html
-Disallow: /403.html
+Disallow: /DESIGN.md
+Disallow: /skills-lock.json
+Disallow: /CLAUDE.md
+Disallow: /GEMINI.md
+Disallow: /.agents/
+Disallow: /supabase/
 
 # Sitemap Location
-Sitemap: https://envision-iimbg.ac.in/sitemap.xml
+Sitemap: https://envision.iimbg.ac.in/sitemap.xml

@@ -4,17 +4,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YES - Youth Entrepreneurship Summit | Envision E-Cell</title>
+  <title>Youth Entrepreneurship Summit (YES) | Envision IIM Bodh Gaya</title>
   <meta name="description"
-    content="Youth Entrepreneurship Summit (YES) by Envision E-Cell IIM Bodh Gaya - A high-energy conclave of founders, investors, and students focused on building founder mindsets and startup conversations." />
+    content="Youth Entrepreneurship Summit (YES) by Envision E-Cell IIM Bodh Gaya - Marquee conclave of founders, investors, and students." />
+  <link rel="canonical" href="https://envision.iimbg.ac.in/yes.html" />
+
+  <!-- Open Graph / Social Tags -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://envision.iimbg.ac.in/yes.html" />
+  <meta property="og:title" content="Youth Entrepreneurship Summit (YES) | Envision IIM Bodh Gaya" />
+  <meta property="og:description" content="A high-energy conclave bringing together visionary founders, venture capitalists, and students at IIM Bodh Gaya." />
+  <meta property="og:image" content="https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Youth Entrepreneurship Summit (YES) | Envision IIM Bodh Gaya" />
+  <meta name="twitter:description" content="A high-energy conclave bringing together visionary founders, venture capitalists, and students at IIM Bodh Gaya." />
+  <meta name="twitter:image" content="https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="cms.css" />
 </head>
 
 <body>
@@ -29,14 +43,15 @@
           <img src="envision-logo-transparent.png" alt="Envision E-Cell" />
         </a>
         <a href="index.html" class="logo-text logo-title-link" aria-label="Envision Home">
-          <h1>ENVISION</h1><span>E-Cell IIM Bodh Gaya</span>
+          <strong class="logo-title">ENVISION</strong><span>E-Cell IIM Bodh Gaya</span>
         </a>
       </div>
-      <nav class="nav-links">
+      <nav class="nav-links" aria-label="Main navigation">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
         <a href="events.html" class="active">Events</a>
         <a href="incubation.html">Incubation</a>
+        <a href="index.html#faq">FAQs</a>
         <a href="contact.html">Contact</a>
       </nav>
       <a href="contact.html" class="nav-cta">Connect With Us</a>
@@ -48,6 +63,7 @@
         <a href="about.html">About</a>
         <a href="events.html">Events</a>
         <a href="incubation.html">Incubation</a>
+        <a href="index.html#faq">FAQs</a>
         <a href="contact.html">Contact</a>
       </div>
     </div>
@@ -56,22 +72,22 @@
   <!-- Hero Section -->
   <section class="event-page-hero">
     <div class="event-hero-inner reveal">
-      <a href="events.html" class="event-breadcrumb" id="back-to-events-link">
+      <a data-cms-id="back-to-events-link" href="events.html" class="event-breadcrumb" id="back-to-events-link">
         <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to All Events
       </a>
       <div class="event-hero-badge-wrap">
         <span class="event-type-badge"><i class="fa-solid fa-bolt"></i> Flagship Summit</span>
         <span class="event-type-badge badge-gold"><i class="fa-solid fa-calendar-check"></i> Annual Conclave</span>
       </div>
-      <h1 class="event-hero-title">Youth Entrepreneurship <span class="gradient-text">Summit (YES)</span></h1>
-      <p class="event-hero-subtitle">
+      <h1 data-cms-id="txt_yes_1" class="event-hero-title">Youth Entrepreneurship <span class="gradient-text animated-word" data-phrases="Summit (YES)|Founders Conclave|Ventures Platform|Innovation Fest">Summit (YES)</span></h1>
+      <p data-cms-id="txt_yes_2" class="event-hero-subtitle">
         A high-energy conclave bringing together visionary founders, venture capitalists, angel investors, students, and
         ecosystem leaders to spark founder mindsets and elevate startup conversations.
       </p>
       <div class="event-hero-actions">
-        <a href="contact.html?subject=YES+Summit+Registration" class="btn btn-primary">Register for YES <i
+        <a data-cms-id="txt_yes_3" href="contact.html?subject=YES+Summit+Registration" class="btn btn-primary">Register for YES <i
             class="fa-solid fa-arrow-right"></i></a>
-        <a href="#agenda" class="btn btn-secondary"><i class="fa-solid fa-clock"></i> View Schedule</a>
+        <a data-cms-id="txt_yes_4" href="#agenda" class="btn btn-secondary"><i class="fa-solid fa-clock"></i> View Schedule</a>
       </div>
     </div>
   </section>
@@ -96,8 +112,8 @@
       <div class="event-meta-item">
         <div class="event-meta-icon icon-gold"><i class="fa-solid fa-microphone-lines"></i></div>
         <div>
-          <span class="event-meta-label">Speakers &amp; VCs</span>
-          <span class="event-meta-value">25+ Leaders &amp; Angels</span>
+          <span class="event-meta-label">Speakers &amp; Angels</span>
+          <span class="event-meta-value">25+ Keynote Speakers &amp; Leaders</span>
         </div>
       </div>
       <div class="event-meta-item">
@@ -115,14 +131,14 @@
     <section class="section" style="padding-top: 0;">
       <div class="container event-section-grid-2">
         <div class="text-block reveal">
-          <div class="section-label">About The Summit</div>
-          <h2>Where ambitious ideas meet <span class="gradient-text">capital and guidance.</span></h2>
-          <p>
+          <div data-cms-id="txt_yes_5" class="section-label">About The Summit</div>
+          <h2 data-cms-id="txt_yes_6">Where ambitious ideas meet <span class="gradient-text">capital and guidance.</span></h2>
+          <p data-cms-id="txt_yes_7">
             The Youth Entrepreneurship Summit (YES) is the marquee entrepreneurship conclave organized by Envision at
             IIM Bodh Gaya. YES serves as the epicenter for groundbreaking ideas, zero-to-one startup wisdom, and
             venture-building discussions.
           </p>
-          <p>
+          <p data-cms-id="txt_yes_8">
             Through keynote addresses by unicorn founders, interactive panel discussions on venture capital dynamics,
             investor demo days, and curated networking dinners, YES bridges the gap between passionate students and the
             broader startup ecosystem.
@@ -130,23 +146,23 @@
         </div>
 
         <div class="event-highlight-card reveal">
-          <div class="section-label">Summit Impact</div>
+          <div data-cms-id="txt_yes_9" class="section-label">Summit Impact</div>
           <div class="event-stat-box-grid">
             <div class="event-stat-box">
-              <h4 data-target="1500" data-suffix="+">1500+</h4>
-              <p>Attendees</p>
+              <h4 data-cms-id="txt_yes_10" data-target="1500" data-suffix="+">1500+</h4>
+              <p data-cms-id="txt_yes_11">Attendees</p>
             </div>
             <div class="event-stat-box">
-              <h4 data-target="25" data-suffix="+">25+</h4>
-              <p>Keynote Speakers</p>
+              <h4 data-cms-id="txt_yes_12" data-target="25" data-suffix="+">25+</h4>
+              <p data-cms-id="txt_yes_13">Keynote Speakers &amp; Leaders</p>
             </div>
             <div class="event-stat-box">
-              <h4 data-target="40" data-suffix="+">40+</h4>
-              <p>Startups Showcased</p>
+              <h4 data-cms-id="txt_yes_14" data-target="40" data-suffix="+">40+</h4>
+              <p data-cms-id="txt_yes_15">Startups Showcased</p>
             </div>
             <div class="event-stat-box">
-              <h4 data-target="50" data-suffix="L+">50L+</h4>
-              <p>Grant &amp; Prize Access</p>
+              <h4 data-cms-id="txt_yes_16" data-target="50" data-suffix="L+">50L+</h4>
+              <p data-cms-id="txt_yes_17">Grant &amp; Prize Access</p>
             </div>
           </div>
         </div>
@@ -157,36 +173,36 @@
     <section class="section" style="background: rgba(7, 17, 29, 0.9);">
       <div class="container">
         <div class="section-heading reveal">
-          <div class="section-label">Summit Pillars</div>
-          <h2>Curated tracks for <span class="gradient-text">founders &amp; investors.</span></h2>
+          <div data-cms-id="txt_yes_18" class="section-label">Summit Pillars</div>
+          <h2 data-cms-id="txt_yes_19">Curated tracks for <span class="gradient-text">founders &amp; investors.</span></h2>
         </div>
 
         <div class="event-pillars-grid">
           <div class="event-pillar-card reveal">
             <div class="event-pillar-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
-            <h3>Founder Keynotes</h3>
-            <p>Direct masterclasses and fireside conversations from pioneering founders sharing hard-earned zero-to-one
+            <h3 data-cms-id="txt_yes_20">Founder Keynotes</h3>
+            <p data-cms-id="txt_yes_21">Direct masterclasses and fireside conversations from pioneering founders sharing hard-earned zero-to-one
               execution blueprints.</p>
           </div>
 
           <div class="event-pillar-card reveal">
             <div class="event-pillar-icon"><i class="fa-solid fa-chart-line"></i></div>
-            <h3>Investor &amp; VC Panels</h3>
-            <p>Leading angel networks and venture capitalists break down the current funding environment, thesis
+            <h3 data-cms-id="txt_yes_22">Investor &amp; VC Panels</h3>
+            <p data-cms-id="txt_yes_23">Leading angel networks and venture capitalists break down the current funding environment, thesis
               evaluation, and growth metrics.</p>
           </div>
 
           <div class="event-pillar-card reveal">
             <div class="event-pillar-icon"><i class="fa-solid fa-rocket"></i></div>
-            <h3>Live Startup Arena</h3>
-            <p>Pre-screened collegiate and early-stage startup founders present their business models live to an
+            <h3 data-cms-id="txt_yes_24">Live Startup Arena</h3>
+            <p data-cms-id="txt_yes_25">Pre-screened collegiate and early-stage startup founders present their business models live to an
               attentive panel of investors.</p>
           </div>
 
           <div class="event-pillar-card reveal">
             <div class="event-pillar-icon"><i class="fa-solid fa-handshake"></i></div>
-            <h3>1-on-1 Mentorship</h3>
-            <p>Speed mentorship corners allowing aspiring student entrepreneurs to receive tailored feedback from
+            <h3 data-cms-id="txt_yes_26">1-on-1 Mentorship</h3>
+            <p data-cms-id="txt_yes_27">Speed mentorship corners allowing aspiring student entrepreneurs to receive tailored feedback from
               seasoned domain leaders.</p>
           </div>
         </div>
@@ -197,16 +213,16 @@
     <section class="section" id="agenda">
       <div class="container">
         <div class="section-heading reveal">
-          <div class="section-label">Schedule &amp; Flow</div>
-          <h2>A day packed with <span class="gradient-text">high-velocity learning.</span></h2>
+          <div data-cms-id="txt_yes_28" class="section-label">Schedule &amp; Flow</div>
+          <h2 data-cms-id="txt_yes_29">A day packed with <span class="gradient-text">high-velocity learning.</span></h2>
         </div>
 
         <div class="event-agenda-wrap reveal">
           <div class="event-agenda-card">
             <div class="event-agenda-time"><i class="fa-regular fa-clock"></i> 09:30 AM</div>
             <div class="event-agenda-info">
-              <h4>Inaugural Address &amp; Keynote</h4>
-              <p>Opening ceremony with institute leadership, guest of honour, and an inspiring keynote on "The DNA of
+              <h4 data-cms-id="txt_yes_30">Inaugural Address &amp; Keynote</h4>
+              <p data-cms-id="txt_yes_31">Opening ceremony with institute leadership, guest of honour, and an inspiring keynote on "The DNA of
                 Indian Entrepreneurship".</p>
             </div>
           </div>
@@ -214,8 +230,8 @@
           <div class="event-agenda-card">
             <div class="event-agenda-time"><i class="fa-regular fa-clock"></i> 11:00 AM</div>
             <div class="event-agenda-info">
-              <h4>Panel: Navigating Seed to Series A</h4>
-              <p>Top venture capitalists and angel syndicate heads discuss valuation, product-market fit metrics, and
+              <h4 data-cms-id="txt_yes_32">Panel: Navigating Seed to Series A</h4>
+              <p data-cms-id="txt_yes_33">Top venture capitalists and angel syndicate heads discuss valuation, product-market fit metrics, and
                 fundraising in emerging markets.</p>
             </div>
           </div>
@@ -223,8 +239,8 @@
           <div class="event-agenda-card">
             <div class="event-agenda-time"><i class="fa-regular fa-clock"></i> 01:30 PM</div>
             <div class="event-agenda-info">
-              <h4>Networking Lunch &amp; Product Demo Showcase</h4>
-              <p>Curated lunch with breakout product demo pods where attendees can experience working prototypes and
+              <h4 data-cms-id="txt_yes_34">Networking Lunch &amp; Product Demo Showcase</h4>
+              <p data-cms-id="txt_yes_35">Curated lunch with breakout product demo pods where attendees can experience working prototypes and
                 beta apps.</p>
             </div>
           </div>
@@ -232,8 +248,8 @@
           <div class="event-agenda-card">
             <div class="event-agenda-time"><i class="fa-regular fa-clock"></i> 03:00 PM</div>
             <div class="event-agenda-info">
-              <h4>Startup Pitch Tracks &amp; Live Jury Evaluation</h4>
-              <p>Shortlisted teams pitch their ventures live, fielding questions from VC partners and industry
+              <h4 data-cms-id="txt_yes_36">Startup Pitch Tracks &amp; Live Jury Evaluation</h4>
+              <p data-cms-id="txt_yes_37">Shortlisted teams pitch their ventures live, fielding questions from VC partners and industry
                 operators.</p>
             </div>
           </div>
@@ -241,8 +257,8 @@
           <div class="event-agenda-card">
             <div class="event-agenda-time"><i class="fa-regular fa-clock"></i> 05:30 PM</div>
             <div class="event-agenda-info">
-              <h4>Valedictory Gala &amp; High-Tea Networking</h4>
-              <p>Recognition of standout startups, announcement of incubation grants, and exclusive mixer for delegates
+              <h4 data-cms-id="txt_yes_38">Valedictory Gala &amp; High-Tea Networking</h4>
+              <p data-cms-id="txt_yes_39">Recognition of standout startups, announcement of incubation grants, and exclusive mixer for delegates
                 and founders.</p>
             </div>
           </div>
@@ -254,16 +270,16 @@
     <section class="section" style="padding-top: 2rem;">
       <div class="container reveal">
         <div class="event-cta-banner">
-          <div class="section-label" style="margin-bottom: 1rem;">Join The Conclave</div>
-          <h2>Be part of the next <span class="gradient-text">YES edition.</span></h2>
-          <p>
+          <div data-cms-id="txt_yes_40" class="section-label" style="margin-bottom: 1rem;">Join The Conclave</div>
+          <h2 data-cms-id="txt_yes_41">Be part of the next <span class="gradient-text">YES edition.</span></h2>
+          <p data-cms-id="txt_yes_42">
             Whether you are a student builder, early-stage founder, mentor, or sponsor looking to connect with emerging
             talent, we invite you to be part of YES.
           </p>
           <div class="event-hero-actions" style="justify-content: center;">
-            <a href="contact.html?subject=YES+Summit+Inquiry" class="btn btn-primary">Register / Inquire <i
+            <a data-cms-id="txt_yes_43" href="contact.html?subject=YES+Summit+Inquiry" class="btn btn-primary">Register / Inquire <i
                 class="fa-solid fa-arrow-right"></i></a>
-            <a href="events.html" class="btn btn-secondary">Explore Other Events</a>
+            <a data-cms-id="txt_yes_44" href="events.html" class="btn btn-secondary">Explore Other Events</a>
           </div>
         </div>
       </div>
@@ -279,44 +295,43 @@
           </video>
         </div>
         <div>
-          <h3
+          <h3 data-cms-id="txt_yes_45"
             style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">
             Explore</h3>
           <ul class="footer-links">
-            <li><a href="about.html">About</a></li>
-            <li><a href="events.html">Events</a></li>
-            <li><a href="incubation.html">Incubation</a></li>
-            <li><a href="index.html#faq">FAQs</a></li>
-            <li><a href="contact.html">Contact</a></li>
+            <li><a data-cms-id="txt_yes_47" href="about.html">About Us</a></li>
+            <li><a data-cms-id="txt_yes_49" href="events.html">Events</a></li>
+            <li><a data-cms-id="txt_yes_51" href="incubation.html">INSPIRE Incubation</a></li>
+            <li><a data-cms-id="txt_yes_53" href="index.html#faq">FAQs</a></li>
+            <li><a data-cms-id="txt_yes_55" href="contact.html">Contact Us</a></li>
           </ul>
         </div>
         <div>
-          <h3
+          <h3 data-cms-id="txt_yes_56"
             style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">
             Reach Out</h3>
           <ul class="footer-links">
-            <li><a href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></li>
-            <li><a href="tel:+916312200238">+91 (0) 631 220 0238</a></li>
+            <li data-cms-id="txt_yes_57">IIM Bodh Gaya Campus, Bihar 824234</li>
+            <li><a data-cms-id="txt_yes_59" href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></li>
+            <li><a data-cms-id="txt_yes_61" href="tel:+916312200238">+91 (0) 631 220 0238</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-meta">
         <span>© <span id="year"></span> ENVISION E-CELL IIM BODH GAYA</span>
-        <span><a href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer"
-            aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a
+        <span><a data-cms-id="txt_yes_62" href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer"
+            aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a data-cms-id="txt_yes_63"
             href="https://iimbg.ac.in/terms-conditions/" target="_blank" rel="noopener noreferrer"
-            aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> • <a
+            aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> • <a data-cms-id="txt_yes_64"
             href="https://iimbg.ac.in/copyright-policy/" target="_blank" rel="noopener noreferrer"
-            aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a
+            aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a data-cms-id="txt_yes_65"
             href="https://iimbg.ac.in/disclaimer/" target="_blank" rel="noopener noreferrer"
             aria-label="Disclaimer, opens in a new tab">Disclaimer</a></span>
       </div>
     </div>
   </footer>
 
-  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
-  <script src="cms.js"></script>
 </body>
 
 </html>

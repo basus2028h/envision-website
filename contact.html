@@ -4,15 +4,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Contact | Envision E-Cell</title>
+  <title>Contact Us | Envision E-Cell IIM Bodh Gaya</title>
+  <meta name="description"
+    content="Get in touch with Envision E-Cell IIM Bodh Gaya for partnerships, incubation inquiries, event sponsorships, and student initiatives." />
+  <link rel="canonical" href="https://envision.iimbg.ac.in/contact.html" />
+
+  <!-- Open Graph / Social Tags -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://envision.iimbg.ac.in/contact.html" />
+  <meta property="og:title" content="Contact Us | Envision E-Cell IIM Bodh Gaya" />
+  <meta property="og:description" content="Reach out to Envision E-Cell at IIM Bodh Gaya for partnerships, venture support, and events." />
+  <meta property="og:image" content="https://envision.iimbg.ac.in/envision-logo.jpeg" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Contact Us | Envision E-Cell IIM Bodh Gaya" />
+  <meta name="twitter:description" content="Reach out to Envision E-Cell at IIM Bodh Gaya for partnerships, venture support, and events." />
+  <meta name="twitter:image" content="https://envision.iimbg.ac.in/envision-logo.jpeg" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="cms.css" />
 </head>
 
 <body>
@@ -27,15 +43,16 @@
           <img src="envision-logo-transparent.png" alt="Envision E-Cell" />
         </a>
         <a href="index.html" class="logo-text logo-title-link" aria-label="Envision Home">
-          <h1>ENVISION</h1><span>E-Cell IIM Bodh Gaya</span>
+          <strong class="logo-title">ENVISION</strong><span>E-Cell IIM Bodh Gaya</span>
         </a>
       </div>
-      <nav class="nav-links">
+      <nav class="nav-links" aria-label="Main navigation">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
         <a href="events.html">Events</a>
         <a href="incubation.html">Incubation</a>
-        <a href="contact.html">Contact</a>
+        <a href="index.html#faq">FAQs</a>
+        <a href="contact.html" class="active">Contact</a>
       </nav>
       <a href="contact.html" class="nav-cta">Connect With Us</a>
       <button class="menu-toggle" aria-label="Toggle navigation"><i class="fa-solid fa-bars"></i></button>
@@ -46,6 +63,7 @@
         <a href="about.html">About</a>
         <a href="events.html">Events</a>
         <a href="incubation.html">Incubation</a>
+        <a href="index.html#faq">FAQs</a>
         <a href="contact.html">Contact</a>
       </div>
     </div>
@@ -53,9 +71,9 @@
 
   <section class="page-hero">
     <div class="page-hero-inner reveal">
-      <div class="section-label">Contact</div>
-      <h1>Let’s build the next chapter <span class="gradient-text">together.</span></h1>
-      <p>Reach out for partnerships, incubation opportunities, student engagement, or event collaborations.</p>
+      <div data-cms-id="txt_contact_1" class="section-label">Contact</div>
+      <h1 data-cms-id="txt_contact_2">Let’s build the next chapter <span class="gradient-text animated-word" data-phrases="together|with purpose|from campus|for tomorrow">together</span>.</h1>
+      <p data-cms-id="txt_contact_3">Reach out for partnerships, incubation opportunities, student engagement, or event collaborations.</p>
     </div>
   </section>
 
@@ -63,8 +81,8 @@
     <section class="section">
       <div class="container contact-grid">
         <div class="contact-panel reveal">
-          <div class="section-label">Reach Out</div>
-          <h2>Connect with us.</h2>
+          <div data-cms-id="txt_contact_4" class="section-label">Reach Out</div>
+          <h2 data-cms-id="txt_contact_5">Connect with us.</h2>
           <div class="contact-list">
             <div class="contact-item">
               <i class="fa-solid fa-location-dot"></i>
@@ -72,7 +90,7 @@
             </div>
             <div class="contact-item">
               <i class="fa-solid fa-envelope"></i>
-              <span><a href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></span>
+              <span><a data-cms-id="txt_contact_6" href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></span>
             </div>
             <div class="contact-item">
               <i class="fa-solid fa-phone"></i>
@@ -82,16 +100,28 @@
         </div>
 
         <div class="form-panel reveal">
-          <div class="section-label">Get In Touch</div>
+          <div data-cms-id="txt_contact_7" class="section-label">Get In Touch</div>
           <form id="contact-form" data-mailto="envision@iimbg.ac.in">
             <div class="form-row">
-              <input type="text" name="name" autocomplete="name" placeholder="Your Name" required />
-              <input type="email" name="email" autocomplete="email" placeholder="Email Address" required />
+              <div>
+                <label for="contact-name" class="visually-hidden">Your Name</label>
+                <input type="text" id="contact-name" name="name" autocomplete="name" placeholder="Your Name" required />
+              </div>
+              <div>
+                <label for="contact-email" class="visually-hidden">Email Address</label>
+                <input type="email" id="contact-email" name="email" autocomplete="email" placeholder="Email Address" required />
+              </div>
             </div>
-            <input type="text" name="subject" placeholder="Subject" required />
-            <textarea name="message" placeholder="Tell us about your interest..." required></textarea>
-            <button type="submit" class="btn btn-primary">Send Message</button>
-            <p class="contact-form-status" role="status" aria-live="polite"></p>
+            <div>
+              <label for="contact-subject" class="visually-hidden">Subject</label>
+              <input type="text" id="contact-subject" name="subject" placeholder="Subject" required />
+            </div>
+            <div>
+              <label for="contact-message" class="visually-hidden">Message</label>
+              <textarea id="contact-message" name="message" placeholder="Tell us about your interest..." required></textarea>
+            </div>
+            <button data-cms-id="txt_contact_8" type="submit" class="btn btn-primary">Send Message</button>
+            <p data-cms-id="txt_contact_9" class="contact-form-status" role="status" aria-live="polite"></p>
           </form>
         </div>
       </div>
@@ -105,45 +135,62 @@
           <video class="signature-clip" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
             <source src="ECell%20Sign%20mail%202026%20(2).mp4" type="video/mp4" />
           </video>
+          <p data-cms-id="txt_contact_10" style="color: var(--muted); margin-top: 1rem;">
+            Centre for Entrepreneurship &amp; Industry Relations, Indian Institute of Management Bodh Gaya.
+          </p>
+          <div class="social-links">
+            <a data-cms-id="txt_contact_11" href="https://www.linkedin.com/company/envision-cell-iim-bodh-gaya/" target="_blank"
+              rel="noopener noreferrer" aria-label="Visit Envision E-Cell on LinkedIn, opens in a new tab">
+              <i class="fa-brands fa-linkedin-in" aria-hidden="true"></i>
+            </a>
+            <a data-cms-id="txt_contact_12" href="https://www.instagram.com/envision_iimbg/" target="_blank" rel="noopener noreferrer"
+              aria-label="Visit Envision E-Cell on Instagram, opens in a new tab">
+              <i class="fa-brands fa-instagram" aria-hidden="true"></i>
+            </a>
+            <a data-cms-id="txt_contact_13" href="https://x.com/ecell_iimbg" target="_blank" rel="noopener noreferrer"
+              aria-label="Visit Envision E-Cell on X, opens in a new tab">
+              <i class="fa-brands fa-twitter" aria-hidden="true"></i>
+            </a>
+          </div>
         </div>
         <div>
-          <h3
+          <h3 data-cms-id="txt_contact_14"
             style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">
             Explore</h3>
           <ul class="footer-links">
-            <li><a href="about.html">About</a></li>
-            <li><a href="events.html">Events</a></li>
-            <li><a href="incubation.html">Incubation</a></li>
-            <li><a href="index.html#faq">FAQs</a></li>
+            <li><a data-cms-id="txt_contact_16" href="about.html">About Us</a></li>
+            <li><a data-cms-id="txt_contact_18" href="events.html">Events</a></li>
+            <li><a data-cms-id="txt_contact_20" href="incubation.html">INSPIRE Incubation</a></li>
+            <li><a data-cms-id="txt_contact_22" href="index.html#faq">FAQs</a></li>
+            <li><a data-cms-id="txt_contact_24" href="contact.html">Contact Us</a></li>
           </ul>
         </div>
         <div>
-          <h3
+          <h3 data-cms-id="txt_contact_25"
             style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">
             Reach Out</h3>
           <ul class="footer-links">
-            <li><a href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></li>
-            <li><a href="tel:+916312200238">+91 (0) 631 220 0238</a></li>
+            <li data-cms-id="txt_contact_26">IIM Bodh Gaya Campus, Bihar 824234</li>
+            <li><a data-cms-id="txt_contact_28" href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></li>
+            <li><a data-cms-id="txt_contact_30" href="tel:+916312200238">+91 (0) 631 220 0238</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-meta">
         <span>© <span id="year"></span> ENVISION E-CELL IIM BODH GAYA</span>
-        <span><a href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer"
-            aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a
+        <span><a data-cms-id="txt_contact_31" href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer"
+            aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a data-cms-id="txt_contact_32"
             href="https://iimbg.ac.in/terms-conditions/" target="_blank" rel="noopener noreferrer"
-            aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> • <a
+            aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> • <a data-cms-id="txt_contact_33"
             href="https://iimbg.ac.in/copyright-policy/" target="_blank" rel="noopener noreferrer"
-            aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a
+            aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a data-cms-id="txt_contact_34"
             href="https://iimbg.ac.in/disclaimer/" target="_blank" rel="noopener noreferrer"
             aria-label="Disclaimer, opens in a new tab">Disclaimer</a></span>
       </div>
     </div>
   </footer>
 
-  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
-  <script src="cms.js"></script>
 </body>
 
 </html>

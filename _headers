@@ -1,0 +1,21 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 0
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://jloywbovucitjxihdibb.supabase.co https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; img-src 'self' data: https: blob:; media-src 'self' data: https: blob:; connect-src 'self' https://jloywbovucitjxihdibb.supabase.co https://*.supabase.co; object-src 'none'; form-action 'self'; base-uri 'self'; frame-ancestors 'none';
+
+/DESIGN.md
+  X-Robots-Tag: noindex, nofollow
+  Content-Type: text/plain
+
+/skills-lock.json
+  X-Robots-Tag: noindex, nofollow
+
+/CLAUDE.md
+  X-Robots-Tag: noindex, nofollow
+
+/GEMINI.md
+  X-Robots-Tag: noindex, nofollow

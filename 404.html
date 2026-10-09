@@ -4,17 +4,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
   <title>404 - Page Not Found | Envision E-Cell IIM Bodh Gaya</title>
   <meta name="description"
     content="The requested page could not be found. Explore Envision E-Cell IIM Bodh Gaya programs, events, and incubation support." />
+  <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="cms.css" />
 </head>
 
 <body>
@@ -29,7 +30,7 @@
           <img src="envision-logo-transparent.png" alt="Envision E-Cell" />
         </a>
         <a href="index.html" class="logo-text logo-title-link" aria-label="Envision Home">
-          <h1>ENVISION</h1><span>E-Cell IIM Bodh Gaya</span>
+          <strong class="logo-title">ENVISION</strong><span>E-Cell IIM Bodh Gaya</span>
         </a>
       </div>
 
@@ -68,7 +69,7 @@
           <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> 404 Error
         </div>
         <div class="error-code">404</div>
-        <h2 class="error-title">Looks like you've ventured off the grid.</h2>
+        <h1 class="error-title">Looks like you've ventured off the grid.</h1>
         <p class="error-description">
           The page you are looking for might have been moved, renamed, or is temporarily unavailable in our ecosystem.
         </p>
@@ -138,7 +139,7 @@
             <li><a href="events.html">Events</a></li>
             <li><a href="incubation.html">INSPIRE Incubation</a></li>
             <li><a href="index.html#faq">FAQs</a></li>
-            <li><a href="contact.html">Campus Ambassadors</a></li>
+            <li><a href="contact.html">Contact Us</a></li>
           </ul>
         </div>
 
@@ -168,9 +169,7 @@
     </div>
   </footer>
 
-  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
-  <script src="cms.js"></script>
 </body>
 
 </html>
