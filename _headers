@@ -19,3 +19,7 @@
 
 /GEMINI.md
   X-Robots-Tag: noindex, nofollow
+
+/placeholder.svg
+  Content-Type: image/svg+xml
+  X-Robots-Tag: noindex, nofollow

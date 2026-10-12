@@ -13,13 +13,15 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://envision.iimbg.ac.in/contact.html" />
   <meta property="og:title" content="Contact Us | Envision E-Cell IIM Bodh Gaya" />
-  <meta property="og:description" content="Reach out to Envision E-Cell at IIM Bodh Gaya for partnerships, venture support, and events." />
+  <meta property="og:description"
+    content="Reach out to Envision E-Cell at IIM Bodh Gaya for partnerships, venture support, and events." />
   <meta property="og:image" content="https://envision.iimbg.ac.in/envision-logo.jpeg" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Contact Us | Envision E-Cell IIM Bodh Gaya" />
-  <meta name="twitter:description" content="Reach out to Envision E-Cell at IIM Bodh Gaya for partnerships, venture support, and events." />
+  <meta name="twitter:description"
+    content="Reach out to Envision E-Cell at IIM Bodh Gaya for partnerships, venture support, and events." />
   <meta name="twitter:image" content="https://envision.iimbg.ac.in/envision-logo.jpeg" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -27,7 +29,9 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 
@@ -46,14 +50,23 @@
           <strong class="logo-title">ENVISION</strong><span>E-Cell IIM Bodh Gaya</span>
         </a>
       </div>
-      <nav class="nav-links" aria-label="Main navigation">
+      <div class="nav-slider-wrapper">
+        <button type="button" class="nav-slider-btn nav-slider-prev" aria-label="Previous navigation items">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <nav class="nav-links" aria-label="Main navigation">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
         <a href="events.html">Events</a>
         <a href="incubation.html">Incubation</a>
         <a href="index.html#faq">FAQs</a>
         <a href="contact.html" class="active">Contact</a>
+        <a href="aic.html">AIC</a>
       </nav>
+        <button type="button" class="nav-slider-btn nav-slider-next" aria-label="Next navigation items">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
       <a href="contact.html" class="nav-cta">Connect With Us</a>
       <button class="menu-toggle" aria-label="Toggle navigation"><i class="fa-solid fa-bars"></i></button>
     </div>
@@ -64,16 +77,19 @@
         <a href="events.html">Events</a>
         <a href="incubation.html">Incubation</a>
         <a href="index.html#faq">FAQs</a>
-        <a href="contact.html">Contact</a>
-      </div>
+        <a href="contact.html" class="active">Contact</a>
+        <a href="aic.html">AIC</a>
+        </div>
     </div>
   </header>
 
   <section class="page-hero">
     <div class="page-hero-inner reveal">
       <div data-cms-id="txt_contact_1" class="section-label">Contact</div>
-      <h1 data-cms-id="txt_contact_2">Let’s build the next chapter <span class="gradient-text animated-word" data-phrases="together|with purpose|from campus|for tomorrow">together</span>.</h1>
-      <p data-cms-id="txt_contact_3">Reach out for partnerships, incubation opportunities, student engagement, or event collaborations.</p>
+      <h1 data-cms-id="txt_contact_2">Let’s build the next chapter <span class="gradient-text animated-word"
+          data-phrases="together|with purpose|from campus|for tomorrow">together</span>.</h1>
+      <p data-cms-id="txt_contact_3">Reach out for partnerships, incubation opportunities, student engagement, or event
+        collaborations.</p>
     </div>
   </section>
 
@@ -109,7 +125,8 @@
               </div>
               <div>
                 <label for="contact-email" class="visually-hidden">Email Address</label>
-                <input type="email" id="contact-email" name="email" autocomplete="email" placeholder="Email Address" required />
+                <input type="email" id="contact-email" name="email" autocomplete="email" placeholder="Email Address"
+                  required />
               </div>
             </div>
             <div>
@@ -118,7 +135,8 @@
             </div>
             <div>
               <label for="contact-message" class="visually-hidden">Message</label>
-              <textarea id="contact-message" name="message" placeholder="Tell us about your interest..." required></textarea>
+              <textarea id="contact-message" name="message" placeholder="Tell us about your interest..."
+                required></textarea>
             </div>
             <button data-cms-id="txt_contact_8" type="submit" class="btn btn-primary">Send Message</button>
             <p data-cms-id="txt_contact_9" class="contact-form-status" role="status" aria-live="polite"></p>
@@ -139,12 +157,13 @@
             Centre for Entrepreneurship &amp; Industry Relations, Indian Institute of Management Bodh Gaya.
           </p>
           <div class="social-links">
-            <a data-cms-id="txt_contact_11" href="https://www.linkedin.com/company/envision-cell-iim-bodh-gaya/" target="_blank"
-              rel="noopener noreferrer" aria-label="Visit Envision E-Cell on LinkedIn, opens in a new tab">
+            <a data-cms-id="txt_contact_11" href="https://www.linkedin.com/company/envision-cell-iim-bodh-gaya/"
+              target="_blank" rel="noopener noreferrer"
+              aria-label="Visit Envision E-Cell on LinkedIn, opens in a new tab">
               <i class="fa-brands fa-linkedin-in" aria-hidden="true"></i>
             </a>
-            <a data-cms-id="txt_contact_12" href="https://www.instagram.com/envision_iimbg/" target="_blank" rel="noopener noreferrer"
-              aria-label="Visit Envision E-Cell on Instagram, opens in a new tab">
+            <a data-cms-id="txt_contact_12" href="https://www.instagram.com/envision_iimbg/" target="_blank"
+              rel="noopener noreferrer" aria-label="Visit Envision E-Cell on Instagram, opens in a new tab">
               <i class="fa-brands fa-instagram" aria-hidden="true"></i>
             </a>
             <a data-cms-id="txt_contact_13" href="https://x.com/ecell_iimbg" target="_blank" rel="noopener noreferrer"
@@ -178,14 +197,14 @@
       </div>
       <div class="footer-meta">
         <span>© <span id="year"></span> ENVISION E-CELL IIM BODH GAYA</span>
-        <span><a data-cms-id="txt_contact_31" href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer"
-            aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a data-cms-id="txt_contact_32"
-            href="https://iimbg.ac.in/terms-conditions/" target="_blank" rel="noopener noreferrer"
-            aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> • <a data-cms-id="txt_contact_33"
-            href="https://iimbg.ac.in/copyright-policy/" target="_blank" rel="noopener noreferrer"
-            aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a data-cms-id="txt_contact_34"
-            href="https://iimbg.ac.in/disclaimer/" target="_blank" rel="noopener noreferrer"
-            aria-label="Disclaimer, opens in a new tab">Disclaimer</a></span>
+        <span><a data-cms-id="txt_contact_31" href="https://iimbg.ac.in/privacy-policy/" target="_blank"
+            rel="noopener noreferrer" aria-label="Privacy Policy, opens in a new tab">Privacy Policy</a> • <a
+            data-cms-id="txt_contact_32" href="https://iimbg.ac.in/terms-conditions/" target="_blank"
+            rel="noopener noreferrer" aria-label="Terms and Conditions, opens in a new tab">Terms and Conditions</a> •
+          <a data-cms-id="txt_contact_33" href="https://iimbg.ac.in/copyright-policy/" target="_blank"
+            rel="noopener noreferrer" aria-label="Copyright Policy, opens in a new tab">Copyright Policy</a> • <a
+            data-cms-id="txt_contact_34" href="https://iimbg.ac.in/disclaimer/" target="_blank"
+            rel="noopener noreferrer" aria-label="Disclaimer, opens in a new tab">Disclaimer</a></span>
       </div>
     </div>
   </footer>

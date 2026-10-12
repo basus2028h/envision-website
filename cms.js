@@ -99,6 +99,7 @@
     '.wp-add-section-divider',
     '.wp-nav-add-btn',
     '.wp-card-toolbar',
+    '.wp-card-btn',
     '.wp-add-card-placeholder',
     '.wp-hero-edit-pill',
     '.wp-card-media-pill',
@@ -108,7 +109,11 @@
     '.cms-ignore',
     '.cms-ghost',
     '.cms-drag-tooltip',
-    '.cms-drop-placeholder'
+    '.cms-drop-placeholder',
+    '.cms-move-btn',
+    '.cms-move-menu-toggle',
+    '.cms-relocate-item',
+    '.cms-relocate-divider'
   ].join(', ');
 
   function getCleanElementHtml(el) {
@@ -124,7 +129,7 @@
     clone.querySelectorAll('[data-cms-card]').forEach((node) => {
       node.removeAttribute('data-cms-card');
     });
-    clone.querySelectorAll('img[data-cms-id][src]').forEach((node) => {
+    clone.querySelectorAll('img[src]').forEach((node) => {
       if (/^data:image\//i.test(node.getAttribute('src') || '')) {
         node.removeAttribute('src');
       }
@@ -288,6 +293,94 @@
   // 1. Storage & Global Hydration
   // ==========================================================================
 
+  function sanitizeEventsContentMap(map) {
+    if (!map || typeof map !== 'object' || pagePath !== 'events.html') return map;
+    // Section headings MUST NEVER be overwritten by Card 1 (YES) text
+    if (map.txt_events_4 && map.txt_events_4.html === 'YES') delete map.txt_events_4;
+    if (map.txt_events_5 && (map.txt_events_5.html === 'Youth Entrepreneurship Summit' || map.txt_events_5.html === 'YES')) delete map.txt_events_5;
+    if (map.txt_events_6 && (map.txt_events_6.html && (map.txt_events_6.html.includes('conclave') || map.txt_events_6.html.includes('founders')))) delete map.txt_events_6;
+
+    // Card 2 (TEDx) must never be duplicate YES
+    if (map.txt_events_13 && map.txt_events_13.html === 'YES') {
+      map.txt_events_12 = { type: 'text', html: 'Talks', style: {} };
+      map.txt_events_13 = { type: 'text', html: 'TEDx', style: {} };
+      map.txt_events_14 = { type: 'text', html: 'Ideas worth spreading', style: {} };
+      map.txt_events_15 = { type: 'text', html: 'An intellectual platform showcasing insight-rich conversations from founders, artists, builders, and leaders.', style: {} };
+    }
+
+    // Card 3 (Odyssey) must never have TEDx subtitle
+    if (map.txt_events_19 && (map.txt_events_19.html === 'TEDx' || map.txt_events_19.html === 'Ideas worth spreading')) {
+      map.txt_events_17 = { type: 'text', html: 'Competition', style: {} };
+      map.txt_events_18 = { type: 'text', html: 'Odyssey', style: {} };
+      map.txt_events_19 = { type: 'text', html: 'Startup B-Plan Competition', style: {} };
+      map.txt_events_20 = { type: 'text', html: 'A challenge-driven platform for students to test ideas, solve real problems, and pitch business models with conviction.', style: {} };
+    }
+
+    // Clean any lingering editor artifacts ("Media Media", move pills)
+    Object.keys(map).forEach((k) => {
+      const item = map[k];
+      if (item && typeof item.html === 'string') {
+        if (item.html.includes('fa-photo-film') || item.html.includes('cms-element-move-pill')) {
+          item.html = item.html.replace(/<div\b[^>]*class="[^"]*cms-element-move-pill[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+          item.html = item.html.replace(/<i\b[^>]*class="[^"]*fa-photo-film[^"]*"[^>]*><\/i>\s*Media/gi, '').trim();
+          if (!item.html || item.html === 'Media') {
+            delete map[k];
+          }
+        }
+      }
+    });
+
+    return map;
+  }
+
+  function normalizeEventsRow(row) {
+    if (!row || pagePath !== 'events.html') return row;
+    const content = row.content_data;
+    if (content && content.txt_events_4 && content.txt_events_4.html === 'YES') {
+      const remapped = {};
+      if (content.txt_events_1) remapped.txt_events_1 = content.txt_events_1;
+      if (content.txt_events_2) remapped.txt_events_2 = content.txt_events_2;
+      if (content.txt_events_3) remapped.txt_events_3 = content.txt_events_3;
+      if (content.txt_events_4) remapped.txt_events_8 = content.txt_events_4;
+      if (content.txt_events_5) remapped.txt_events_9 = content.txt_events_5;
+      if (content.txt_events_6) remapped.txt_events_10 = content.txt_events_6;
+      if (content.txt_events_7) remapped.txt_events_11 = content.txt_events_7;
+      if (content.txt_events_8) remapped.txt_events_13 = content.txt_events_8;
+      if (content.txt_events_9) remapped.txt_events_14 = content.txt_events_9;
+      if (content.txt_events_10) remapped.txt_events_15 = content.txt_events_10;
+      if (content.txt_events_11) remapped.txt_events_16 = content.txt_events_11;
+      if (content.txt_events_12) remapped.txt_events_18 = content.txt_events_12;
+      if (content.txt_events_13) remapped.txt_events_19 = content.txt_events_13;
+      if (content.txt_events_14) remapped.txt_events_20 = content.txt_events_14;
+      if (content.txt_events_15) remapped.txt_events_21 = content.txt_events_15;
+      if (content.txt_events_16) remapped.txt_events_22 = content.txt_events_16;
+      if (content.txt_events_17) remapped.txt_events_23 = content.txt_events_17;
+      if (content.txt_events_18) remapped.txt_events_24 = content.txt_events_18;
+      if (content.txt_events_19) remapped.txt_events_25 = content.txt_events_19;
+      if (content.txt_events_20) remapped.txt_events_26 = content.txt_events_20;
+      if (content.txt_events_21) remapped.txt_events_27 = content.txt_events_21;
+      if (content.txt_events_22) remapped.txt_events_28 = content.txt_events_22;
+      if (content.txt_events_23) remapped.txt_events_29 = content.txt_events_23;
+      for (let i = 24; i <= 38; i++) {
+        const oldKey = 'txt_events_' + i;
+        const newKey = 'txt_events_' + (i + 6);
+        if (content[oldKey]) remapped[newKey] = content[oldKey];
+      }
+      row.content_data = remapped;
+    }
+    // Always preserve canonical section headings and clean card grid on events.html
+    if (row.grid_data && row.grid_data.grid_events_1) {
+      delete row.grid_data.grid_events_1;
+    }
+    if (row.grid_data && row.grid_data.grid_events_2 && row.grid_data.grid_events_2.includes('<p></p>')) {
+      delete row.grid_data.grid_events_2;
+    }
+    if (row.content_data) {
+      row.content_data = sanitizeEventsContentMap(row.content_data);
+    }
+    return row;
+  }
+
   async function syncContentFromSupabase() {
     if (!window.supabaseClient) return;
     try {
@@ -300,42 +393,47 @@
       if (globalData && globalData.global_styles) {
         globalStyles = { ...globalStyles, ...globalData.global_styles };
         applyGlobalStyles(globalStyles);
-        localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles));
+        try { localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles)); } catch (e) { }
         if (Array.isArray(globalData.global_styles._nav) && globalData.global_styles._nav.length > 0) {
-          localStorage.setItem(CMS_NAV_KEY, JSON.stringify(globalData.global_styles._nav));
+          try { localStorage.setItem(CMS_NAV_KEY, JSON.stringify(globalData.global_styles._nav)); } catch (e) { }
           loadGlobalNavigation();
         }
       }
 
-      const { data, error } = await window.supabaseClient
+      let { data, error } = await window.supabaseClient
         .from('site_content')
         .select('*')
         .eq('page_path', pagePath)
         .maybeSingle();
 
       if (!error && data) {
+        data = normalizeEventsRow(data);
         if (data.grid_data && Object.keys(data.grid_data).length > 0) {
+          if (pagePath === 'events.html') delete data.grid_data.grid_events_1;
           Object.keys(data.grid_data).forEach((gridId) => {
             const gridEl = document.querySelector(`[data-cms-grid-id="${gridId}"]`);
             if (gridEl && data.grid_data[gridId]) {
               gridEl.innerHTML = sanitizeHtml(data.grid_data[gridId]);
+              // Notify script.js to re-observe any new .reveal / .leader-card nodes
+              gridEl.dispatchEvent(new CustomEvent('cmsGridRestored', { bubbles: true, detail: { gridId } }));
             }
           });
-          localStorage.setItem(gridStorageKey, JSON.stringify(data.grid_data));
+          try { localStorage.setItem(gridStorageKey, JSON.stringify(data.grid_data)); } catch (e) { }
         }
 
         if (data.content_data && Object.keys(data.content_data).length > 0) {
-          pageContentMap = { ...pageContentMap, ...data.content_data };
+          data.content_data = sanitizeEventsContentMap(data.content_data);
+          pageContentMap = sanitizeEventsContentMap({ ...pageContentMap, ...data.content_data });
           applyPageContent(pageContentMap);
-          localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
+          try { localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap)); } catch (e) { }
         }
 
         if (data.global_styles && Object.keys(data.global_styles).length > 0) {
           globalStyles = { ...globalStyles, ...data.global_styles };
           applyGlobalStyles(globalStyles);
-          localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles));
+          try { localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles)); } catch (e) { }
           if (Array.isArray(data.global_styles._nav) && data.global_styles._nav.length > 0) {
-            localStorage.setItem(CMS_NAV_KEY, JSON.stringify(data.global_styles._nav));
+            try { localStorage.setItem(CMS_NAV_KEY, JSON.stringify(data.global_styles._nav)); } catch (e) { }
             loadGlobalNavigation();
           }
         }
@@ -350,11 +448,20 @@
       // 1. Restore dynamic grid structures (added/deleted cards)
       const storedGrids = localStorage.getItem(gridStorageKey);
       if (storedGrids) {
-        const gridMap = JSON.parse(storedGrids);
+        let gridMap = JSON.parse(storedGrids);
+        if (pagePath === 'events.html' && gridMap.grid_events_1) {
+          // If grid_events_1 has duplicate cards or editor artifacts, wipe it so clean static HTML renders
+          if (gridMap.grid_events_1.includes('fa-photo-film') || (gridMap.grid_events_1.match(/YES/g) || []).length > 2 || gridMap.grid_events_1.includes('wp-add-card-placeholder')) {
+            delete gridMap.grid_events_1;
+            try { localStorage.setItem(gridStorageKey, JSON.stringify(gridMap)); } catch (e) { }
+          }
+        }
         Object.keys(gridMap).forEach((gridId) => {
           const gridEl = document.querySelector(`[data-cms-grid-id="${gridId}"]`);
           if (gridEl && gridMap[gridId]) {
             gridEl.innerHTML = sanitizeHtml(gridMap[gridId]);
+            // Notify script.js to re-observe any new .reveal / .leader-card nodes
+            gridEl.dispatchEvent(new CustomEvent('cmsGridRestored', { bubbles: true, detail: { gridId } }));
           }
         });
       }
@@ -363,6 +470,7 @@
       const stored = localStorage.getItem(pageStorageKey);
       if (stored) {
         pageContentMap = JSON.parse(stored);
+        pageContentMap = sanitizeEventsContentMap(pageContentMap);
         applyPageContent(pageContentMap);
       }
 
@@ -399,48 +507,134 @@
     });
   }
 
-  function loadGlobalNavigation() {
-    try {
-      const storedNav = localStorage.getItem(CMS_NAV_KEY);
-      if (storedNav) {
-        let navList = JSON.parse(storedNav);
-        if (Array.isArray(navList)) {
-          let hasDirty = false;
-          // Filter out accidental dummy "New Tab" entries and clean titles
-          navList = navList
-            .filter((item) => {
-              const clean = (item.title || '').trim().toLowerCase().replace(/^move\s+/i, '');
-              if (clean === 'new tab' || !clean) {
-                hasDirty = true;
-                return false;
-              }
-              return true;
-            })
-            .map((item) => {
-              const cleanTitle = (item.title || '').replace(/^Move\s+/i, '').trim();
-              if (cleanTitle !== item.title) hasDirty = true;
-              return { ...item, title: cleanTitle };
-            });
+  const CANONICAL_PAGES = [
+    { title: 'Home', url: 'index.html' },
+    { title: 'About', url: 'about.html' },
+    { title: 'Events', url: 'events.html' },
+    { title: 'Incubation', url: 'incubation.html' },
+    { title: 'FAQs', url: 'index.html#faq' },
+    { title: 'Contact', url: 'contact.html' },
+    { title: 'AIC', url: 'aic.html' }
+  ];
 
-          if (hasDirty) {
-            localStorage.setItem(CMS_NAV_KEY, JSON.stringify(navList));
-          }
+  function reconcileNavList(baseList) {
+    let list = Array.isArray(baseList) ? [...baseList] : [];
+    // Filter out accidental dummy "New Tab" entries and clean titles
+    list = list
+      .filter((item) => {
+        const clean = (item.title || '').trim().toLowerCase().replace(/^move\s+/i, '');
+        return clean !== 'new tab' && clean.length > 0;
+      })
+      .map((item) => ({
+        ...item,
+        title: (item.title || '').replace(/^Move\s+/i, '').trim()
+      }));
 
-          if (navList.length > 0) {
-            const navContainers = document.querySelectorAll('.nav-links, .mobile-menu-inner');
-            navContainers.forEach((container) => {
-              const isMobile = container.classList.contains('mobile-menu-inner');
-              container.innerHTML = navList.map((item) => `<a href="${sanitizeUrl(item.url)}">${escapeHtml(item.title)}</a>`).join('');
-              if (isMobile && !container.querySelector('.mobile-connect')) {
-                const connect = document.createElement('a');
-                connect.href = 'contact.html';
-                connect.className = 'mobile-connect';
-                connect.textContent = 'Connect With Us';
-                container.append(connect);
-              }
-            });
+    // If no navigation was found, fallback to links present in current DOM
+    if (list.length === 0) {
+      document.querySelectorAll('.nav-links > a:not(.nav-cta), .mobile-menu-inner > a:not(.mobile-connect)').forEach(a => {
+        const url = (a.getAttribute('href') || '').trim();
+        const title = a.textContent.replace(/^Move\s+/i, '').trim();
+        if (url && title && !url.startsWith('#') && !url.startsWith('javascript:') && title.toLowerCase() !== 'new tab') {
+          if (!list.some(item => (item.url || '').toLowerCase() === url.toLowerCase())) {
+            list.push({ title, url });
           }
         }
+      });
+    }
+
+    // Ensure all canonical pages are present
+    CANONICAL_PAGES.forEach((canon) => {
+      if (!list.some(item => (item.url || '').toLowerCase() === canon.url.toLowerCase())) {
+        if (canon.title === 'FAQs') {
+          const contactIdx = list.findIndex(item => (item.url || '').toLowerCase() === 'contact.html');
+          if (contactIdx !== -1) {
+            list.splice(contactIdx, 0, { title: canon.title, url: canon.url });
+            return;
+          }
+        }
+        list.push({ title: canon.title, url: canon.url });
+      }
+    });
+
+    return list;
+  }
+
+  async function persistGlobalNavigation(updatedList) {
+    if (!Array.isArray(updatedList) || updatedList.length === 0) return;
+
+    // 1. Update localStorage immediately for this and other pages in session
+    try {
+      localStorage.setItem(CMS_NAV_KEY, JSON.stringify(updatedList));
+    } catch (e) { }
+
+    // 2. Keep in-memory global styles aligned
+    globalStyles['_nav'] = updatedList;
+    try {
+      localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles));
+    } catch (e) { }
+
+    // 3. Immediately update DOM on the current page
+    loadGlobalNavigation();
+
+    // 4. Synchronize static HTML files on disk across all pages via server API
+    try {
+      await fetch('/api/save-nav-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nav: updatedList })
+      });
+    } catch (err) { }
+
+    // 5. Persist to Supabase _global row so any user/browser gets the updated header
+    if (window.supabaseClient) {
+      try {
+        await window.supabaseClient.from('site_content').upsert({
+          page_path: '_global',
+          content_data: {},
+          grid_data: {},
+          global_styles: { ...globalStyles, _nav: updatedList },
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'page_path' });
+      } catch (err) {
+        console.warn('[Supabase] Global nav sync notice:', err);
+      }
+    }
+
+    // 6. Notify other open tabs/windows
+    try {
+      window.dispatchEvent(new CustomEvent('cmsNavUpdated', { detail: { nav: updatedList } }));
+    } catch (e) { }
+  }
+
+  function loadGlobalNavigation() {
+    try {
+      let navList = [];
+      const storedNav = localStorage.getItem(CMS_NAV_KEY);
+      if (storedNav) {
+        try { navList = JSON.parse(storedNav); } catch (e) { }
+      }
+      navList = reconcileNavList(navList);
+      localStorage.setItem(CMS_NAV_KEY, JSON.stringify(navList));
+
+      if (navList.length > 0) {
+        const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+        const navContainers = document.querySelectorAll('.nav-links, .mobile-menu-inner');
+        navContainers.forEach((container) => {
+          const isMobile = container.classList.contains('mobile-menu-inner');
+          container.innerHTML = navList.map((item) => {
+            const isActive = (item.url === currentPath || (item.url === 'index.html' && currentPath === '')) ? ' class="active"' : '';
+            return `<a href="${sanitizeUrl(item.url)}"${isActive}>${escapeHtml(item.title)}</a>`;
+          }).join('');
+          if (isMobile && !container.querySelector('.mobile-connect')) {
+            const connect = document.createElement('a');
+            connect.href = 'contact.html';
+            connect.className = 'mobile-connect';
+            connect.textContent = 'Connect With Us';
+            container.append(connect);
+          }
+        });
+        if (typeof window.initNavSlider === 'function') window.initNavSlider();
       }
       // Clean up any lingering + buttons or New Tab links in DOM
       document.querySelectorAll('.wp-nav-add-btn').forEach(btn => btn.remove());
@@ -453,6 +647,12 @@
       console.warn('[CMS] Failed to load global navigation:', e);
     }
   }
+
+  window.addEventListener('storage', (e) => {
+    if (e.key === CMS_NAV_KEY && e.newValue) {
+      loadGlobalNavigation();
+    }
+  });
 
   function loadGlobalStyles() {
     try {
@@ -578,11 +778,13 @@
     // Texts, buttons, links, labels, badges, items
     const textSelectors = [
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'p', '.section-label', '.badge', '.leader-name',
+      'p', '.section-label', '.badge', '.card-badge', '.leader-name',
       '.leader-role', '.leader-tagline', '.faq-title',
       '.stat-number', '.stat-label', '.btn', 'a', 'button',
       'li', '.hero-tagline', '.nav-cta', '.logo-text span', '.logo-text h1',
-      '.brand-text', '.mobile-connect'
+      '.brand-text', '.mobile-connect',
+      // Catch-all: any element already pre-tagged with data-cms-id (except images)
+      '[data-cms-id]:not(img):not(video)'
     ];
 
     document.querySelectorAll(textSelectors.join(',')).forEach((el) => {
@@ -958,7 +1160,7 @@
 
   // --- Universal Element Relocate & Move Handle Controller ---
   function attachRelocateControls(el) {
-    if (!el || el.querySelector(':scope > .cms-element-move-pill')) return;
+    if (!el || el.closest('.card, .leader-card, .faq-item, .stat-box') || el.querySelector(':scope > .cms-element-move-pill')) return;
     el.setAttribute('data-cms-relocatable', 'true');
 
     const pill = document.createElement('div');
@@ -1496,6 +1698,9 @@
       pageContentMap[id] = pageContentMap[id] || {};
       pageContentMap[id].type = 'text';
       pageContentMap[id].html = getCleanElementHtml(el);
+      try {
+        localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
+      } catch (err) { }
     }
   }
 
@@ -2019,31 +2224,44 @@
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          navItems = parsed
-            .filter(item => {
-              const clean = (item.title || '').trim().toLowerCase().replace(/^move\s+/i, '');
-              return clean !== 'new tab' && clean.length > 0;
-            })
-            .map((item) => ({
-              ...item,
-              title: (item.title || '').replace(/^Move\s+/i, '').trim()
-            }));
+          navItems = parsed;
         }
       } catch (e) { }
     }
+    navItems = reconcileNavList(navItems);
 
     const backdrop = document.createElement('div');
     backdrop.className = 'cms-modal-backdrop open';
     backdrop.innerHTML = `
-      <div class="cms-modal-box">
+      <div class="cms-modal-box" style="max-width: 680px;">
         <div class="cms-modal-header">
-          <h3 class="cms-modal-title"><i class="fa-solid fa-compass" style="color: var(--wp-primary);"></i> Navigation Menu Manager</h3>
+          <h3 class="cms-modal-title"><i class="fa-solid fa-arrows-left-right" style="color: var(--wp-primary);"></i> Navigation Menu Order & Manager</h3>
           <button type="button" class="cms-modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p style="font-size: 13px; color: #64748b; margin: 0 0 16px;">Add, edit, or remove navigation tabs across all pages on the site.</p>
+        <p style="font-size: 13px; color: #64748b; margin: 0 0 12px;">
+          Use the <strong><i class="fa-solid fa-arrow-left"></i> Shift Left</strong> and <strong><i class="fa-solid fa-arrow-right"></i> Shift Right</strong> buttons to decide which tab comes first, second, etc. in the header track.
+        </p>
+
+        <!-- Live Sequence Track Preview -->
+        <div class="wp-nav-preview-box">
+          <div class="wp-nav-preview-title">
+            <i class="fa-solid fa-bars-staggered"></i> Live Header Sequence Preview (Left to Right)
+          </div>
+          <div class="wp-nav-chips-track" id="wp-nav-preview-chips"></div>
+        </div>
+
         <div class="wp-nav-manager-list" id="wp-nav-list-container">
           ${navItems.map((item, i) => `
             <div class="wp-nav-item-row" data-index="${i}">
+              <span class="wp-nav-badge">#${i + 1}</span>
+              <div class="wp-nav-shift-group">
+                <button type="button" class="wp-nav-shift-btn wp-nav-shift-left" title="Shift Left (Move Earlier in Header)">
+                  <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <button type="button" class="wp-nav-shift-btn wp-nav-shift-right" title="Shift Right (Move Later in Header)">
+                  <i class="fa-solid fa-arrow-right"></i>
+                </button>
+              </div>
               <input type="text" class="wp-nav-title" value="${escapeHtml(item.title)}" placeholder="Tab Label" />
               <input type="text" class="wp-nav-url" value="${escapeHtml(item.url)}" placeholder="URL (e.g. events.html)" />
               <button type="button" class="wp-nav-item-del" title="Remove Tab"><i class="fa-solid fa-trash"></i></button>
@@ -2055,7 +2273,7 @@
         </button>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
           <button type="button" class="wp-bar-btn wp-modal-cancel" style="background:#f1f5f9; color:#475569;">Cancel</button>
-          <button type="button" class="wp-bar-btn btn-publish" id="wp-save-nav-btn">Save Menu</button>
+          <button type="button" class="wp-bar-btn btn-publish" id="wp-save-nav-btn"><i class="fa-solid fa-check"></i> Save Order</button>
         </div>
       </div>
     `;
@@ -2063,23 +2281,111 @@
     backdrop.querySelector('.cms-modal-close').onclick = () => backdrop.remove();
     backdrop.querySelector('.wp-modal-cancel').onclick = () => backdrop.remove();
 
+    const listContainer = backdrop.querySelector('#wp-nav-list-container');
+    const chipsTrack = backdrop.querySelector('#wp-nav-preview-chips');
+
+    function updateRowControls() {
+      const rows = Array.from(listContainer.querySelectorAll('.wp-nav-item-row'));
+      rows.forEach((row, idx) => {
+        row.setAttribute('data-index', idx);
+        const badge = row.querySelector('.wp-nav-badge');
+        if (badge) badge.textContent = '#' + (idx + 1);
+
+        const leftBtn = row.querySelector('.wp-nav-shift-left');
+        const rightBtn = row.querySelector('.wp-nav-shift-right');
+        if (leftBtn) leftBtn.disabled = (idx === 0);
+        if (rightBtn) rightBtn.disabled = (idx === rows.length - 1);
+      });
+
+      if (chipsTrack) {
+        chipsTrack.innerHTML = rows.map((row, idx) => {
+          const title = (row.querySelector('.wp-nav-title')?.value || '').trim() || 'Tab';
+          return `<div class="wp-nav-chip"><span class="chip-num">${idx + 1}</span> <span>${escapeHtml(title)}</span></div>`;
+        }).join('');
+      }
+    }
+
+    function bindRowEvents(row) {
+      const leftBtn = row.querySelector('.wp-nav-shift-left');
+      const rightBtn = row.querySelector('.wp-nav-shift-right');
+      const delBtn = row.querySelector('.wp-nav-item-del');
+      const titleInput = row.querySelector('.wp-nav-title');
+
+      if (leftBtn) {
+        leftBtn.onclick = (e) => {
+          e.preventDefault();
+          const prev = row.previousElementSibling;
+          if (prev) {
+            listContainer.insertBefore(row, prev);
+            row.classList.add('is-swapping');
+            setTimeout(() => row.classList.remove('is-swapping'), 250);
+            updateRowControls();
+          }
+        };
+      }
+
+      if (rightBtn) {
+        rightBtn.onclick = (e) => {
+          e.preventDefault();
+          const next = row.nextElementSibling;
+          if (next) {
+            listContainer.insertBefore(next, row);
+            row.classList.add('is-swapping');
+            setTimeout(() => row.classList.remove('is-swapping'), 250);
+            updateRowControls();
+          }
+        };
+      }
+
+      if (delBtn) {
+        delBtn.onclick = () => {
+          row.remove();
+          updateRowControls();
+        };
+      }
+
+      if (titleInput) {
+        titleInput.oninput = () => {
+          updateRowControls();
+        };
+      }
+    }
+
+    listContainer.querySelectorAll('.wp-nav-item-row').forEach(bindRowEvents);
+    updateRowControls();
+
     backdrop.querySelector('#wp-nav-add-row').onclick = () => {
+      const rows = listContainer.querySelectorAll('.wp-nav-item-row');
+      const newIdx = rows.length;
       const row = document.createElement('div');
-      row.className = 'wp-nav-item-row';
+      row.className = 'wp-nav-item-row is-swapping';
       row.innerHTML = `
+        <span class="wp-nav-badge">#${newIdx + 1}</span>
+        <div class="wp-nav-shift-group">
+          <button type="button" class="wp-nav-shift-btn wp-nav-shift-left" title="Shift Left (Move Earlier in Header)">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+          <button type="button" class="wp-nav-shift-btn wp-nav-shift-right" title="Shift Right (Move Later in Header)">
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
         <input type="text" class="wp-nav-title" value="New Tab" placeholder="Tab Label" />
         <input type="text" class="wp-nav-url" value="#" placeholder="URL (e.g. summit.html)" />
         <button type="button" class="wp-nav-item-del" title="Remove Tab"><i class="fa-solid fa-trash"></i></button>
       `;
-      row.querySelector('.wp-nav-item-del').onclick = () => row.remove();
-      backdrop.querySelector('#wp-nav-list-container').append(row);
+      listContainer.append(row);
+      bindRowEvents(row);
+      setTimeout(() => row.classList.remove('is-swapping'), 250);
+      updateRowControls();
     };
 
-    backdrop.querySelectorAll('.wp-nav-item-del').forEach((btn) => {
-      btn.onclick = () => btn.closest('.wp-nav-item-row').remove();
-    });
+    backdrop.querySelector('#wp-save-nav-btn').onclick = async () => {
+      const saveBtn = backdrop.querySelector('#wp-save-nav-btn');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving Across Site...';
+      }
 
-    backdrop.querySelector('#wp-save-nav-btn').onclick = () => {
       const updatedList = [];
       backdrop.querySelectorAll('.wp-nav-item-row').forEach((row) => {
         const title = row.querySelector('.wp-nav-title').value.replace(/^Move\s+/i, '').trim();
@@ -2087,10 +2393,10 @@
         if (title && url) updatedList.push({ title, url });
       });
 
-      localStorage.setItem(CMS_NAV_KEY, JSON.stringify(updatedList));
-      loadGlobalNavigation();
+      await persistGlobalNavigation(updatedList);
+
       backdrop.remove();
-      showToast('Navigation menu updated across site!', 'success');
+      showToast('Navigation sequence updated & synchronized across all pages!', 'success');
     };
 
     document.body.append(backdrop);
@@ -2100,39 +2406,465 @@
   // 7. Dedicated Event Page Generator
   // ==========================================================================
 
-  function openEventPageGeneratorModal() {
+  // ==========================================================================
+  // 7. Dedicated Page Creator & Manager (Event, Content, Showcase, Canvas)
+  // ==========================================================================
+
+  function buildThemeCss(styles) {
+    styles = styles || {};
+    let css = ':root {\n';
+    if (styles.bg) css += `  --bg: ${styles.bg} !important;\n`;
+    if (styles.bg2) css += `  --bg-2: ${styles.bg2} !important;\n`;
+    if (styles.panel) {
+      css += `  --panel: ${styles.panel} !important;\n  --panel-strong: ${styles.panel} !important;\n`;
+    }
+    if (styles.line) css += `  --line: ${styles.line} !important;\n`;
+    if (styles.primaryColor) {
+      css += `  --blue: ${styles.primaryColor} !important;\n  --blue-strong: ${styles.primaryColor} !important;\n  --navy: ${styles.primaryColor} !important;\n`;
+    }
+    if (styles.accentColor) {
+      css += `  --gold: ${styles.accentColor} !important;\n  --gold-soft: ${styles.accentColor} !important;\n  --gold-strong: ${styles.accentColor} !important;\n`;
+    }
+    if (styles.text) css += `  --text: ${styles.text} !important;\n`;
+    if (styles.muted) css += `  --muted: ${styles.muted} !important;\n`;
+    if (styles.radius) css += `  --card-radius: ${styles.radius} !important;\n`;
+    css += '}\n';
+
+    if (styles.fontPrimary) {
+      css += `body, p, span, a, li, input, button { font-family: ${styles.fontPrimary}, -apple-system, sans-serif !important; }\n`;
+    }
+    if (styles.fontHeading) {
+      css += `h1, h2, h3, h4, h5, h6, .section-label, .stat-number, .leader-name, .logo-title { font-family: ${styles.fontHeading}, sans-serif !important; }\n`;
+    }
+    if (styles.fontMono) {
+      css += `code, pre, .mono-eyebrow, .badge, .section-label { font-family: ${styles.fontMono}, monospace !important; }\n`;
+    }
+
+    if (styles.isDarkMode) {
+      css += `body { background-color: ${styles.bg || '#0b0f19'} !important; color: ${styles.text || '#f1f5f9'} !important; }\n`;
+      css += `.ambient-canvas { background: ${styles.bg || '#0b0f19'} !important; }\n`;
+      css += `.topbar { background: rgba(11, 15, 25, 0.92) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important; }\n`;
+      css += `.card, .stat-box, .faq-item, .promo-band, .leader-card { background: ${styles.panel || '#131b2e'} !important; border-color: ${styles.line || 'rgba(255, 255, 255, 0.12)'} !important; color: ${styles.text || '#f1f5f9'} !important; }\n`;
+      css += `.card-body p, .faq-answer p, .stat-label { color: ${styles.muted || '#94a3b8'} !important; }\n`;
+    } else if (styles.bg) {
+      css += `body { background-color: ${styles.bg} !important; }\n`;
+      css += `.ambient-canvas { background: ${styles.bg} !important; }\n`;
+    }
+    return css;
+  }
+
+  function generateNewPageHTML(opts) {
+    const title = escapeHtml(opts.title || 'New Page');
+    const tagline = escapeHtml(opts.tagline || 'Building the future of entrepreneurship at IIM Bodh Gaya.');
+    const filename = (opts.filename || 'new-page.html').trim();
+    const slug = filename.replace(/\.html$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const template = opts.template || 'content';
+    const navList = Array.isArray(opts.navList) && opts.navList.length > 0 ? opts.navList : [
+      { title: 'Home', url: 'index.html' },
+      { title: 'About', url: 'about.html' },
+      { title: 'Events', url: 'events.html' },
+      { title: 'Incubation', url: 'incubation.html' },
+      { title: 'Contact', url: 'contact.html' }
+    ];
+    const styles = opts.styles || {};
+    const themeCss = buildThemeCss(styles);
+    const bodyClass = styles.isDarkMode ? 'class="theme-dark"' : '';
+
+    const navHtml = navList.map(item => {
+      const isActive = item.url === filename ? ' class="active"' : '';
+      return `<a href="${escapeHtml(item.url)}"${isActive}>${escapeHtml(item.title)}</a>`;
+    }).join('\n        ');
+
+    const mobileNavHtml = navList.map(item => {
+      return `<a href="${escapeHtml(item.url)}">${escapeHtml(item.title)}</a>`;
+    }).join('\n        ');
+
+    let mainContent = '';
+
+    if (template === 'event') {
+      mainContent = `
+    <!-- Event Hero Details -->
+    <section class="section" id="about-event">
+      <div class="container grid-2">
+        <div class="text-block reveal">
+          <div data-cms-id="txt_${slug}_4" class="section-label">About the Event</div>
+          <h2 data-cms-id="txt_${slug}_5">Building the next wave of founders.</h2>
+          <p data-cms-id="txt_${slug}_6">${title} is the marquee entrepreneurial gathering bringing together students, startups, innovators, and investors for an intensive journey of learning, collaboration, and pitching.</p>
+          <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+            <a data-cms-id="txt_${slug}_7" href="#register" class="btn btn-primary"><i class="fa-solid fa-ticket"></i> Register Now</a>
+            <a data-cms-id="txt_${slug}_8" href="contact.html" class="btn btn-secondary"><i class="fa-solid fa-envelope"></i> Contact Organizers</a>
+          </div>
+        </div>
+        <div class="image-panel reveal">
+          <img data-cms-id="img_${slug}_1" src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop" alt="${title}" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Tracks & Highlights -->
+    <section class="section bg-light">
+      <div class="container">
+        <div class="section-heading reveal">
+          <div data-cms-id="txt_${slug}_9" class="section-label">Event Highlights</div>
+          <h2 data-cms-id="txt_${slug}_10">What to Expect at ${title}</h2>
+          <p data-cms-id="txt_${slug}_11">Explore key segments designed to accelerate ideas, connect with mentors, and compete for grants.</p>
+        </div>
+        <div data-cms-grid-id="grid_${slug}_1" class="cards-grid grid-3">
+          <article class="card reveal">
+            <div class="card-icon"><i class="fa-solid fa-lightbulb"></i></div>
+            <h3 data-cms-id="txt_${slug}_12">Pitch Arena</h3>
+            <p data-cms-id="txt_${slug}_13">Present your venture to active angel investors, venture capitalists, and industry stalwarts.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon"><i class="fa-solid fa-users-gear"></i></div>
+            <h3 data-cms-id="txt_${slug}_14">Masterclasses</h3>
+            <p data-cms-id="txt_${slug}_15">Deep-dive sessions on scaling, product-market fit, and fundraising led by veteran founders.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon"><i class="fa-solid fa-trophy"></i></div>
+            <h3 data-cms-id="txt_${slug}_16">Grants &amp; Incubation</h3>
+            <p data-cms-id="txt_${slug}_17">Top teams win cash prizes, incubation support, and direct mentorship from INSPIRE.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Register CTA -->
+    <section class="section" id="register">
+      <div class="container">
+        <div class="promo-band reveal">
+          <div data-cms-id="txt_${slug}_18" class="section-label">Join the Experience</div>
+          <h2 data-cms-id="txt_${slug}_19">Be part of ${title} at IIM Bodh Gaya.</h2>
+          <p data-cms-id="txt_${slug}_20">Registrations are open for student founders, startups, and innovators nationwide.</p>
+          <a data-cms-id="txt_${slug}_21" href="contact.html" class="btn btn-primary">Get in Touch / Register <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+      </div>
+    </section>`;
+    } else if (template === 'showcase') {
+      mainContent = `
+    <!-- Stats Highlight -->
+    <section class="section">
+      <div class="container">
+        <div data-cms-grid-id="grid_${slug}_1" class="stat-grid">
+          <div class="stat-box reveal">
+            <div data-cms-id="txt_${slug}_4" class="stat-number">50+</div>
+            <div data-cms-id="txt_${slug}_5" class="stat-label">Startups Supported</div>
+          </div>
+          <div class="stat-box reveal">
+            <div data-cms-id="txt_${slug}_6" class="stat-number">&#8377;1.5Cr+</div>
+            <div data-cms-id="txt_${slug}_7" class="stat-label">Funding &amp; Grants</div>
+          </div>
+          <div class="stat-box reveal">
+            <div data-cms-id="txt_${slug}_8" class="stat-number">40+</div>
+            <div data-cms-id="txt_${slug}_9" class="stat-label">Industry Mentors</div>
+          </div>
+          <div class="stat-box reveal">
+            <div data-cms-id="txt_${slug}_10" class="stat-number">10k+</div>
+            <div data-cms-id="txt_${slug}_11" class="stat-label">Community Reach</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pillars Grid -->
+    <section class="section bg-light">
+      <div class="container">
+        <div class="section-heading reveal">
+          <div data-cms-id="txt_${slug}_12" class="section-label">Key Pillars</div>
+          <h2 data-cms-id="txt_${slug}_13">Core Programs &amp; Initiatives</h2>
+          <p data-cms-id="txt_${slug}_14">A structured pathway to take bold entrepreneurial ideas into sustainable ventures.</p>
+        </div>
+        <div data-cms-grid-id="grid_${slug}_2" class="cards-grid grid-4">
+          <article class="card reveal">
+            <span class="badge">Track 1</span>
+            <h3 data-cms-id="txt_${slug}_15">Ideation &amp; Validation</h3>
+            <p data-cms-id="txt_${slug}_16">Design thinking workshops, rapid prototyping, and customer validation sprints.</p>
+          </article>
+          <article class="card reveal">
+            <span class="badge">Track 2</span>
+            <h3 data-cms-id="txt_${slug}_17">Founder Mentorship</h3>
+            <p data-cms-id="txt_${slug}_18">1-on-1 advisory with alumni founders, venture builders, and domain leaders.</p>
+          </article>
+          <article class="card reveal">
+            <span class="badge">Track 3</span>
+            <h3 data-cms-id="txt_${slug}_19">Investor Readiness</h3>
+            <p data-cms-id="txt_${slug}_20">Financial modeling, deck refining, and dry-run pitches before demo days.</p>
+          </article>
+          <article class="card reveal">
+            <span class="badge">Track 4</span>
+            <h3 data-cms-id="txt_${slug}_21">Market Access</h3>
+            <p data-cms-id="txt_${slug}_22">Enterprise pilot opportunities, partner credits, and incubator networks.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="section">
+      <div class="container">
+        <div class="section-heading reveal">
+          <div data-cms-id="txt_${slug}_23" class="section-label">Questions &amp; Answers</div>
+          <h2 data-cms-id="txt_${slug}_24">Frequently Asked Questions</h2>
+        </div>
+        <div data-cms-grid-id="grid_${slug}_3" class="faq-accordion">
+          <div class="faq-item reveal">
+            <h3 data-cms-id="txt_${slug}_25" class="faq-title">Who is eligible to participate in this initiative?</h3>
+            <div class="faq-answer"><p data-cms-id="txt_${slug}_26">Students, alumni, and aspiring entrepreneurs across universities are encouraged to apply.</p></div>
+          </div>
+          <div class="faq-item reveal">
+            <h3 data-cms-id="txt_${slug}_27" class="faq-title">How can founders access mentor sessions?</h3>
+            <div class="faq-answer"><p data-cms-id="txt_${slug}_28">Selected teams are paired with mentors through structured cohort schedules and office hours.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>`;
+    } else if (template === 'blank') {
+      mainContent = `
+    <!-- Custom Page Canvas -->
+    <section class="section">
+      <div class="container">
+        <div class="text-block reveal" style="max-width: 820px; margin: 0 auto; text-align: center;">
+          <div data-cms-id="txt_${slug}_4" class="section-label">Page Canvas</div>
+          <h2 data-cms-id="txt_${slug}_5">Welcome to ${title}</h2>
+          <p data-cms-id="txt_${slug}_6">This is your custom page canvas. Click Edit Mode in Visual Studio to write content, replace images, or insert ready-made blocks using the Section Library.</p>
+          <div style="margin-top: 2rem;">
+            <a data-cms-id="txt_${slug}_7" href="index.html" class="btn btn-primary"><i class="fa-solid fa-arrow-left"></i> Return Home</a>
+          </div>
+        </div>
+      </div>
+    </section>`;
+    } else {
+      // Standard content template
+      mainContent = `
+    <!-- Main Story & Overview -->
+    <section class="section">
+      <div class="container grid-2">
+        <div class="text-block reveal">
+          <div data-cms-id="txt_${slug}_4" class="section-label">Overview</div>
+          <h2 data-cms-id="txt_${slug}_5">Empowering innovation from campus to the world.</h2>
+          <p data-cms-id="txt_${slug}_6">${tagline}</p>
+          <p data-cms-id="txt_${slug}_7">Through tailored mentorship, industry immersion, and ecosystem grants, we help turn early-stage thinking into robust, venture-backed reality.</p>
+          <div style="margin-top: 1.8rem;">
+            <a data-cms-id="txt_${slug}_8" href="contact.html" class="btn btn-primary">Connect With Us <i class="fa-solid fa-arrow-right"></i></a>
+          </div>
+        </div>
+        <div class="image-panel reveal">
+          <img data-cms-id="img_${slug}_1" src="mission-campus.jpg" alt="${title}" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Core Features Grid -->
+    <section class="section bg-light">
+      <div class="container">
+        <div class="section-heading reveal">
+          <div data-cms-id="txt_${slug}_9" class="section-label">Key Highlights</div>
+          <h2 data-cms-id="txt_${slug}_10">What We Offer</h2>
+          <p data-cms-id="txt_${slug}_11">Explore the resources, programs, and network available through Envision.</p>
+        </div>
+        <div data-cms-grid-id="grid_${slug}_1" class="cards-grid grid-3">
+          <article class="card reveal">
+            <div class="card-icon"><i class="fa-solid fa-compass"></i></div>
+            <h3 data-cms-id="txt_${slug}_12">Guided Mentorship</h3>
+            <p data-cms-id="txt_${slug}_13">Direct access to experienced alumni, faculty advisors, and venture capitalists.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon"><i class="fa-solid fa-rocket"></i></div>
+            <h3 data-cms-id="txt_${slug}_14">Venture Incubation</h3>
+            <p data-cms-id="txt_${slug}_15">Collaborative co-working, seed funding assistance, and market pilot access.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon"><i class="fa-solid fa-handshake"></i></div>
+            <h3 data-cms-id="txt_${slug}_16">Industry Ecosystem</h3>
+            <p data-cms-id="txt_${slug}_17">Connections with Angel networks, government startup schemes, and corporate partners.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Action Banner -->
+    <section class="section">
+      <div class="container">
+        <div class="promo-band reveal">
+          <div data-cms-id="txt_${slug}_18" class="section-label">Get Involved</div>
+          <h2 data-cms-id="txt_${slug}_19">Ready to start your journey?</h2>
+          <p data-cms-id="txt_${slug}_20">Reach out to our team at IIM Bodh Gaya and take the next leap for your venture.</p>
+          <a data-cms-id="txt_${slug}_21" href="contact.html" class="btn btn-primary">Contact Envision E-Cell <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+      </div>
+    </section>`;
+    }
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title} | Envision E-Cell IIM Bodh Gaya</title>
+  <meta name="description" content="${tagline}" />
+  <link rel="canonical" href="https://envision.iimbg.ac.in/${filename}" />
+
+  <!-- Open Graph / Social Tags -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://envision.iimbg.ac.in/${filename}" />
+  <meta property="og:title" content="${title} | Envision E-Cell IIM Bodh Gaya" />
+  <meta property="og:description" content="${tagline}" />
+  <meta property="og:image" content="https://envision.iimbg.ac.in/envision-logo.jpeg" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${title} | Envision E-Cell IIM Bodh Gaya" />
+  <meta name="twitter:description" content="${tagline}" />
+  <meta name="twitter:image" content="https://envision.iimbg.ac.in/envision-logo.jpeg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Live Dynamic Global Theme -->
+  <style id="cms-dynamic-global-styles">
+${themeCss}
+  </style>
+</head>
+
+<body ${bodyClass}>
+  <header class="topbar">
+    <div class="nav-wrap">
+      <div class="logo logo-pair">
+        <a href="https://iimbg.ac.in/" class="logo-mark logo-institute-link" target="_blank" rel="noopener noreferrer" aria-label="Visit IIM Bodh Gaya website, opens in a new tab">
+          <img src="iimbg-crest-transparent.png" alt="IIM Bodh Gaya" />
+        </a>
+        <a href="index.html" class="logo-mark logo-brand" aria-label="Envision Home">
+          <img src="envision-logo-transparent.png" alt="Envision E-Cell" />
+        </a>
+        <a href="index.html" class="logo-text logo-title-link" aria-label="Envision Home">
+          <strong class="logo-title">ENVISION</strong><span>E-Cell IIM Bodh Gaya</span>
+        </a>
+      </div>
+      <div class="nav-slider-wrapper">
+        <button type="button" class="nav-slider-btn nav-slider-prev" aria-label="Previous navigation items">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <nav class="nav-links" aria-label="Main navigation">
+          ${navHtml}
+        </nav>
+        <button type="button" class="nav-slider-btn nav-slider-next" aria-label="Next navigation items">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+      <a href="contact.html" class="nav-cta">Connect With Us</a>
+      <button class="menu-toggle" aria-label="Toggle navigation"><i class="fa-solid fa-bars"></i></button>
+    </div>
+    <div class="mobile-menu" aria-label="Mobile navigation">
+      <div class="mobile-menu-inner">
+        ${mobileNavHtml}
+        <a href="contact.html" class="mobile-connect">Connect With Us</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Page Hero -->
+  <section class="page-hero">
+    <div class="page-hero-inner reveal">
+      <div data-cms-id="txt_${slug}_1" class="section-label">${escapeHtml(title)}</div>
+      <h1 data-cms-id="txt_${slug}_2">${escapeHtml(title)}</h1>
+      <p data-cms-id="txt_${slug}_3">${tagline}</p>
+    </div>
+  </section>
+
+  <main>
+${mainContent}
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <video class="signature-clip" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+            <source src="ECell%20Sign%20mail%202026%20(2).mp4" type="video/mp4" />
+          </video>
+        </div>
+        <div>
+          <h3 style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">Explore</h3>
+          <ul class="footer-links">
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="events.html">Events</a></li>
+            <li><a href="incubation.html">INSPIRE Incubation</a></li>
+            <li><a href="index.html#faq">FAQs</a></li>
+            <li><a href="contact.html">Contact Us</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="margin: 0 0 1.2rem; font-family: 'Montserrat',sans-serif; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8rem;">Reach Out</h3>
+          <ul class="footer-links">
+            <li>IIM Bodh Gaya Campus, Bihar 824234</li>
+            <li><a href="mailto:envision@iimbg.ac.in">envision@iimbg.ac.in</a></li>
+            <li><a href="tel:+916312200238">+91 (0) 631 220 0238</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-meta">
+        <span>© <span id="year"></span> ENVISION E-CELL IIM BODH GAYA</span>
+        <span>
+          <a href="https://iimbg.ac.in/privacy-policy/" target="_blank" rel="noopener noreferrer">Privacy Policy</a> •
+          <a href="https://iimbg.ac.in/terms-conditions/" target="_blank" rel="noopener noreferrer">Terms and Conditions</a> •
+          <a href="https://iimbg.ac.in/copyright-policy/" target="_blank" rel="noopener noreferrer">Copyright Policy</a> •
+          <a href="https://iimbg.ac.in/disclaimer/" target="_blank" rel="noopener noreferrer">Disclaimer</a>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>`;
+  }
+
+  function openNewPageModal(defaultTemplate = 'content') {
     const backdrop = document.createElement('div');
     backdrop.className = 'cms-modal-backdrop open';
     backdrop.innerHTML = `
-      <div class="cms-modal-box">
+      <div class="cms-modal-box" style="width: min(640px, 94vw); max-height: 90vh; overflow-y: auto;">
         <div class="cms-modal-header">
-          <h3 class="cms-modal-title"><i class="fa-solid fa-calendar-plus" style="color: var(--wp-accent);"></i> Dedicated Event Page Creator</h3>
+          <h3 class="cms-modal-title"><i class="fa-solid fa-file-circle-plus" style="color: var(--wp-accent, #c5a059);"></i> Add New HTML Page</h3>
           <button type="button" class="cms-modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <p style="font-size: 13px; color: #64748b; margin: 0 0 16px;">
-          Create a standalone, full-featured event page (like Odyssey, TEDx, or YES) with hero banner, schedule, speaker lineup, and registration.
+          Create a new HTML page with the exact same theme, fonts, headers, and footer across your website.
         </p>
-        <form id="wp-event-gen-form">
-          <div class="wp-panel-group">
-            <label class="wp-control-label" style="display:block; margin-bottom: 6px;">Event Name:</label>
-            <input type="text" id="wp-event-name" class="wp-input" style="width:100%;" placeholder="e.g. MANTHAN 3.0 / STARTUP SUMMIT" required />
+        <form id="wp-new-page-form">
+          <div class="wp-panel-group" style="margin-bottom: 12px;">
+            <label class="wp-control-label" style="display:block; margin-bottom: 6px; font-weight: 600;">Page Title:</label>
+            <input type="text" id="wp-new-page-title" class="wp-input" style="width:100%;" placeholder="e.g. Manthan 3.0 / Campus Ventures / Mentors" required />
           </div>
-          <div class="wp-panel-group">
-            <label class="wp-control-label" style="display:block; margin-bottom: 6px;">Tagline / Theme:</label>
-            <input type="text" id="wp-event-tagline" class="wp-input" style="width:100%;" placeholder="e.g. The Flagship National B-Plan Competition" required />
+          <div class="wp-panel-group" style="margin-bottom: 12px;">
+            <label class="wp-control-label" style="display:block; margin-bottom: 6px; font-weight: 600;">HTML File Name:</label>
+            <input type="text" id="wp-new-page-filename" class="wp-input" style="width:100%;" placeholder="e.g. ventures.html" required />
+            <small style="font-size: 11px; color: #64748b; display: block; margin-top: 4px;">Must end in .html (e.g. <code>manthan.html</code>, <code>summit.html</code>)</small>
           </div>
-          <div class="wp-panel-group">
-            <label class="wp-control-label" style="display:block; margin-bottom: 6px;">HTML File Name:</label>
-            <input type="text" id="wp-event-filename" class="wp-input" style="width:100%;" placeholder="e.g. manthan.html" required />
+          <div class="wp-panel-group" style="margin-bottom: 12px;">
+            <label class="wp-control-label" style="display:block; margin-bottom: 6px; font-weight: 600;">Tagline / Subtitle:</label>
+            <input type="text" id="wp-new-page-tagline" class="wp-input" style="width:100%;" placeholder="e.g. Empowering bold ideas and next-gen student ventures" required />
           </div>
-          <div class="wp-panel-group">
+          <div class="wp-panel-group" style="margin-bottom: 14px;">
+            <label class="wp-control-label" style="display:block; margin-bottom: 6px; font-weight: 600;">Page Layout Template:</label>
+            <select id="wp-new-page-template" class="wp-select" style="width:100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+              <option value="content" ${defaultTemplate === 'content' ? 'selected' : ''}>📄 Standard Content &amp; Initiatives (Hero, Story 2-col, 3 Feature Cards, CTA)</option>
+              <option value="event" ${defaultTemplate === 'event' ? 'selected' : ''}>🌟 Dedicated Event &amp; Conclave (Hero Banner, About 2-col, Highlights 3-Grid, Registration)</option>
+              <option value="showcase" ${defaultTemplate === 'showcase' ? 'selected' : ''}>🚀 Program &amp; Showcase (Hero, Stats Numbers, 4-Track Grid, FAQ Accordion)</option>
+              <option value="blank" ${defaultTemplate === 'blank' ? 'selected' : ''}>🎨 Clean Starter Canvas (Hero + Editable container ready for Section Blocks)</option>
+            </select>
+          </div>
+          <div class="wp-panel-group" style="margin-bottom: 18px;">
             <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-              <input type="checkbox" id="wp-event-add-nav" checked /> Add to main navigation menu automatically
+              <input type="checkbox" id="wp-new-page-add-nav" checked /> Add to main navigation menu automatically across all pages
             </label>
           </div>
-          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
             <button type="button" class="wp-bar-btn wp-modal-cancel" style="background:#f1f5f9; color:#475569;">Cancel</button>
-            <button type="submit" class="wp-bar-btn btn-publish"><i class="fa-solid fa-file-code"></i> Generate Event Page</button>
+            <button type="submit" class="wp-bar-btn btn-publish"><i class="fa-solid fa-file-circle-plus"></i> Create HTML Page</button>
           </div>
         </form>
       </div>
@@ -2141,138 +2873,190 @@
     backdrop.querySelector('.cms-modal-close').onclick = () => backdrop.remove();
     backdrop.querySelector('.wp-modal-cancel').onclick = () => backdrop.remove();
 
-    backdrop.querySelector('#wp-event-gen-form').onsubmit = (e) => {
+    // Auto-slugify filename based on title
+    const titleInput = backdrop.querySelector('#wp-new-page-title');
+    const filenameInput = backdrop.querySelector('#wp-new-page-filename');
+    let userEditedFilename = false;
+
+    filenameInput.addEventListener('input', () => {
+      userEditedFilename = filenameInput.value.trim().length > 0;
+    });
+
+    titleInput.addEventListener('input', () => {
+      if (!userEditedFilename) {
+        const slug = titleInput.value.trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        filenameInput.value = slug ? `${slug}.html` : '';
+      }
+    });
+
+    backdrop.querySelector('#wp-new-page-form').onsubmit = async (e) => {
       e.preventDefault();
-      const eventName = document.getElementById('wp-event-name').value.trim();
-      const tagline = document.getElementById('wp-event-tagline').value.trim();
-      let filename = document.getElementById('wp-event-filename').value.trim();
-      if (!filename.endsWith('.html')) filename += '.html';
+      const title = titleInput.value.trim();
+      const tagline = backdrop.querySelector('#wp-new-page-tagline').value.trim();
+      let filename = filenameInput.value.trim();
+      if (!filename.toLowerCase().endsWith('.html')) filename += '.html';
+      const template = backdrop.querySelector('#wp-new-page-template').value;
+      const addToNav = backdrop.querySelector('#wp-new-page-add-nav').checked;
 
-      const addToNav = document.getElementById('wp-event-add-nav').checked;
-      const generatedHTML = generateEventPageHTML(eventName, tagline, filename);
-
-      const blob = new Blob([generatedHTML], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      // Current navigation list
+      const storedNav = localStorage.getItem(CMS_NAV_KEY);
+      let navList = [];
+      try { if (storedNav) navList = JSON.parse(storedNav); } catch (err) { }
+      if (!Array.isArray(navList) || navList.length === 0) {
+        document.querySelectorAll('.nav-links > a:not(.nav-cta):not(.wp-nav-add-btn)').forEach(link => {
+          const t = link.textContent.trim().replace(/^Move\s+/i, '');
+          if (t && t.toLowerCase() !== 'new tab') {
+            navList.push({ title: t, url: link.getAttribute('href') || '#' });
+          }
+        });
+      }
 
       if (addToNav) {
-        const stored = localStorage.getItem(CMS_NAV_KEY);
-        let navList = [];
-        try { if (stored) navList = JSON.parse(stored); } catch (err) { }
-        if (navList.length === 0) {
-          document.querySelectorAll('.nav-links > a:not(.nav-cta):not(.wp-nav-add-btn)').forEach(link => {
-            navList.push({ title: link.textContent.trim(), url: link.getAttribute('href') });
-          });
+        // Prevent duplicate navigation entries
+        const existingIdx = navList.findIndex(item => (item.url || '').toLowerCase() === filename.toLowerCase());
+        if (existingIdx !== -1) {
+          navList[existingIdx].title = title;
+        } else {
+          navList.push({ title, url: filename });
         }
-        navList.push({ title: eventName, url: filename });
+      }
+
+      // Generate complete HTML with embedded active theme & layout
+      const generatedHTML = generateNewPageHTML({
+        title,
+        tagline,
+        filename,
+        template,
+        navList,
+        styles: globalStyles
+      });
+
+      // 1. Try to save file directly to disk via local dev server API
+      let diskSaved = false;
+      try {
+        const res = await fetch('/api/save-page', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename, title, addToNav, html: generatedHTML })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) diskSaved = true;
+        }
+      } catch (err) {
+        try {
+          const res2 = await fetch('http://localhost:3456/api/save-page', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename, title, addToNav, html: generatedHTML })
+          });
+          if (res2.ok) {
+            const json2 = await res2.json();
+            if (json2.success) diskSaved = true;
+          }
+        } catch (err2) { }
+      }
+
+      // 2. Fallback: Save File Picker or Direct Download
+      if (!diskSaved) {
+        if ('showSaveFilePicker' in window) {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: filename,
+              types: [{ description: 'HTML Page', accept: { 'text/html': ['.html'] } }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(generatedHTML);
+            await writable.close();
+            diskSaved = true;
+          } catch (pickerErr) { }
+        }
+        if (!diskSaved) {
+          const blob = new Blob([generatedHTML], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.append(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        }
+      }
+
+      // 3. Sync to Supabase site_content table
+      if (window.supabaseClient) {
+        try {
+          const slug = filename.replace(/\.html$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const initialContentData = {
+            [`txt_${slug}_1`]: { type: 'text', html: title },
+            [`txt_${slug}_2`]: { type: 'text', html: title },
+            [`txt_${slug}_3`]: { type: 'text', html: tagline }
+          };
+
+          await window.supabaseClient.from('site_content').upsert({
+            page_path: filename,
+            content_data: initialContentData,
+            grid_data: {},
+            global_styles: globalStyles,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'page_path' });
+
+          if (addToNav) {
+            await window.supabaseClient.from('site_content').upsert({
+              page_path: '_global',
+              global_styles: { ...globalStyles, _nav: navList },
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'page_path' });
+          }
+        } catch (syncErr) {
+          console.warn('[Supabase] Sync new page notice:', syncErr);
+        }
+      }
+
+      // 4. Update local navigation
+      if (addToNav) {
         localStorage.setItem(CMS_NAV_KEY, JSON.stringify(navList));
         loadGlobalNavigation();
       }
 
       backdrop.remove();
-      showToast(`Event page "${filename}" created & downloaded!`, 'success');
+      openPageCreatedSuccessModal(filename, title, diskSaved);
     };
 
     document.body.append(backdrop);
   }
 
-  function generateEventPageHTML(title, tagline, filename) {
-    const cleanTitle = escapeHtml(title);
-    const cleanTagline = escapeHtml(tagline);
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${cleanTitle} | Envision E-Cell</title>
-  <meta name="description" content="${cleanTagline} - Organized by Envision E-Cell IIM Bodh Gaya." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="nav-wrap">
-      <div class="logo logo-pair">
-        <a href="https://iimbg.ac.in/" class="logo-mark logo-institute-link" target="_blank" rel="noopener noreferrer" aria-label="Visit IIM Bodh Gaya website">
-          <img src="iimbg-crest-transparent.png" alt="IIM Bodh Gaya" />
-        </a>
-        <a href="index.html" class="logo-mark logo-brand" aria-label="Envision Home">
-          <img src="envision-logo-transparent.png" alt="Envision E-Cell" />
-        </a>
-        <a href="index.html" class="logo-text logo-title-link" aria-label="Envision Home">
-          <h1>ENVISION</h1><span>E-Cell IIM Bodh Gaya</span>
-        </a>
-      </div>
-      <nav class="nav-links">
-        <a href="index.html">Home</a>
-        <a href="about.html">About</a>
-        <a href="events.html">Events</a>
-        <a href="incubation.html">Incubation</a>
-        <a href="contact.html">Contact</a>
-      </nav>
-      <a href="contact.html" class="nav-cta">Connect With Us</a>
-      <button class="menu-toggle" aria-label="Toggle navigation"><i class="fa-solid fa-bars"></i></button>
-    </div>
-  </header>
+  function openEventPageGeneratorModal() {
+    return openNewPageModal('event');
+  }
 
-  <section class="page-hero">
-    <div class="page-hero-inner reveal">
-      <div class="section-label"><i class="fa-solid fa-calendar-star"></i> Featured Flagship Event</div>
-      <h1>${cleanTitle}</h1>
-      <p class="hero-tagline">${cleanTagline}</p>
-      <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
-        <a href="#register" class="btn btn-primary"><i class="fa-solid fa-ticket"></i> Register Now</a>
-        <a href="#about-event" class="btn btn-secondary"><i class="fa-solid fa-info-circle"></i> Learn More</a>
-      </div>
-    </div>
-  </section>
-
-  <main>
-    <section class="section" id="about-event">
-      <div class="container grid-2">
-        <div class="text-block reveal">
-          <div class="section-label">About the Event</div>
-          <h2>Building the next wave of founders.</h2>
-          <p>${cleanTitle} is the marquee entrepreneurial gathering bringing together students, startups, innovators, and investors for an intensive journey of learning, collaboration, and pitching.</p>
+  function openPageCreatedSuccessModal(filename, title, diskSaved) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'cms-modal-backdrop open';
+    backdrop.innerHTML = `
+      <div class="cms-modal-box" style="text-align: center; max-width: 480px; padding: 28px 24px;">
+        <div style="width: 56px; height: 56px; background: #ecfdf5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+          <i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 28px;"></i>
         </div>
-        <div class="image-panel reveal">
-          <img src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop" alt="${cleanTitle}" />
+        <h3 style="margin: 0 0 8px; font-size: 19px; color: #0f172a;">Page Created Successfully!</h3>
+        <p style="font-size: 13.5px; color: #64748b; margin: 0 0 20px; line-height: 1.5;">
+          <strong>${escapeHtml(filename)}</strong> has been generated with your active theme, fonts, and full navigation.
+          ${diskSaved ? '<br/><span style="color:#10b981; font-weight:600;"><i class="fa-solid fa-hard-drive"></i> Saved directly to your project workspace!</span>' : '<br/>Downloaded to your system. Move it to the project root to view locally.'}
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <a href="${encodeURI(filename)}" class="wp-bar-btn btn-publish" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open "${escapeHtml(filename)}"
+          </a>
+          <button type="button" class="wp-bar-btn cms-success-close" style="background:#f1f5f9; color:#475569;">Close</button>
         </div>
       </div>
-    </section>
-
-    <section class="section" id="register">
-      <div class="container">
-        <div class="promo-band reveal">
-          <div class="section-label">Join the Experience</div>
-          <h2>Be part of ${cleanTitle} at IIM Bodh Gaya.</h2>
-          <p>Registrations are now open for teams and individual innovators across India.</p>
-          <a href="contact.html" class="btn btn-primary">Get in Touch / Register <i class="fa-solid fa-arrow-right"></i></a>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="container">
-      <div class="footer-meta">
-        <span>© ENVISION E-CELL IIM BODH GAYA</span>
-      </div>
-    </div>
-  </footer>
-
-  <script src="script.js"></script>
-</body>
-</html>`;
+    `;
+    backdrop.querySelector('.cms-success-close').onclick = () => backdrop.remove();
+    document.body.append(backdrop);
   }
 
   // ==========================================================================
@@ -2878,6 +3662,7 @@
         <div class="wp-bar-dropdown">
           <button type="button" class="wp-bar-btn"><i class="fa-solid fa-plus"></i> New <i class="fa-solid fa-caret-down" style="font-size:10px;"></i></button>
           <div class="wp-dropdown-menu">
+            <button type="button" class="wp-dropdown-item" id="wp-new-html-page-btn"><i class="fa-solid fa-file-circle-plus"></i> Add New HTML Page</button>
             <button type="button" class="wp-dropdown-item" id="wp-new-event-page-btn"><i class="fa-solid fa-calendar-plus"></i> Dedicated Event Page</button>
             <button type="button" class="wp-dropdown-item" id="wp-new-nav-tab-btn"><i class="fa-solid fa-compass"></i> Add Navigation Tab</button>
             <button type="button" class="wp-dropdown-item" id="wp-new-section-btn"><i class="fa-solid fa-layer-group"></i> Add Section Block</button>
@@ -3438,7 +4223,8 @@
     document.getElementById('wp-global-styles-btn').onclick = openThemeStudioModal;
     document.getElementById('wp-nav-manager-btn').onclick = openNavManagerModal;
     document.getElementById('wp-new-nav-tab-btn').onclick = openNavManagerModal;
-    document.getElementById('wp-new-event-page-btn').onclick = openEventPageGeneratorModal;
+    document.getElementById('wp-new-html-page-btn').onclick = () => openNewPageModal('content');
+    document.getElementById('wp-new-event-page-btn').onclick = () => openNewPageModal('event');
     document.getElementById('wp-new-section-btn').onclick = () => {
       openTemplateLibraryModal((html) => {
         const temp = document.createElement('div');
@@ -3974,6 +4760,11 @@
           container.style.height = heightVal;
           container.style.position = 'relative';
 
+          // Capture data-cms-id from the element being replaced so the new
+          // element stays tracked in content_data (not only as raw grid HTML).
+          const oldMedia = container.querySelector('img, video');
+          const inheritedCmsId = oldMedia ? oldMedia.getAttribute('data-cms-id') : null;
+
           // Remove old img or video elements inside container
           container.querySelectorAll('img, video').forEach(el => el.remove());
 
@@ -3989,6 +4780,8 @@
             video.style.width = '100%';
             video.style.height = '100%';
             video.setAttribute('data-cms-editable-image', 'true');
+            // Re-attach the original cms-id so save captures this via content_data
+            if (inheritedCmsId) video.setAttribute('data-cms-id', inheritedCmsId);
             container.prepend(video);
             video.play().catch(() => { });
           } else {
@@ -4000,6 +4793,8 @@
             img.style.width = '100%';
             img.style.height = '100%';
             img.setAttribute('data-cms-editable-image', 'true');
+            // Re-attach the original cms-id so save captures this via content_data
+            if (inheritedCmsId) img.setAttribute('data-cms-id', inheritedCmsId);
             container.prepend(img);
           }
 
@@ -4018,7 +4813,8 @@
             badgeEl.remove();
           }
         } else if (targetEl.tagName === 'IMG' || targetEl.tagName === 'VIDEO') {
-          // Standalone image or video
+          // Standalone image or video — inherit cms-id from the replaced element
+          const inheritedCmsId = targetEl.getAttribute('data-cms-id');
           if (mediaType === 'video') {
             const video = document.createElement('video');
             video.className = targetEl.className;
@@ -4029,6 +4825,7 @@
             video.src = mediaSrc;
             video.style.objectFit = fitVal;
             video.setAttribute('data-cms-editable-image', 'true');
+            if (inheritedCmsId) video.setAttribute('data-cms-id', inheritedCmsId);
             targetEl.replaceWith(video);
           } else {
             const img = document.createElement('img');
@@ -4037,6 +4834,7 @@
             img.alt = altVal;
             img.style.objectFit = fitVal;
             img.setAttribute('data-cms-editable-image', 'true');
+            if (inheritedCmsId) img.setAttribute('data-cms-id', inheritedCmsId);
             targetEl.replaceWith(img);
           }
         }
@@ -4336,8 +5134,9 @@
 
     const session = await getAuthorizedSession();
     if (!session) {
-      showToast('Publishing requires an authorized Supabase administrator session.', 'error');
+      showToast('Publishing requires an authorized Supabase administrator session. Please sign in.', 'error');
       await checkAuthSession();
+      openLoginModal();
       return;
     }
 
@@ -4346,8 +5145,39 @@
     document.querySelectorAll('[data-cms-grid-id]').forEach((grid) => {
       const gridId = grid.getAttribute('data-cms-grid-id');
       gridMap[gridId] = sanitizeHtml(getCleanElementHtml(grid));
+
+      // Also capture any [data-cms-id] images/videos inside this grid into
+      // pageContentMap so they are saved via the stable content_data path too.
+      grid.querySelectorAll('[data-cms-id]').forEach((el) => {
+        const id = el.getAttribute('data-cms-id');
+        if (!id) return;
+        if (el.tagName === 'IMG') {
+          const srcVal = el.getAttribute('src') || el.src || '';
+          if (srcVal.startsWith('data:image/') && srcVal.length > 200000) {
+            if (!pageContentMap[id] || !pageContentMap[id].src) {
+              pageContentMap[id] = { type: 'image', src: 'placeholder.svg', alt: el.alt || '' };
+            }
+          } else {
+            pageContentMap[id] = {
+              type: 'image',
+              src: srcVal,
+              alt: el.alt || ''
+            };
+          }
+        } else if (el.tagName === 'VIDEO') {
+          pageContentMap[id] = {
+            type: 'image', // stored as 'image' type; src holds the video url
+            src: el.getAttribute('src') || el.src,
+            alt: ''
+          };
+        }
+      });
     });
-    localStorage.setItem(gridStorageKey, JSON.stringify(gridMap));
+    try {
+      localStorage.setItem(gridStorageKey, JSON.stringify(gridMap));
+    } catch (e) {
+      console.warn('[CMS] localStorage grid quota notice:', e);
+    }
 
     // 2. Save all texts and images
     document.querySelectorAll('[data-cms-id]').forEach((el) => {
@@ -4360,12 +5190,19 @@
       if (offsetY !== null) elStyle.offsetY = offsetY;
 
       if (el.tagName === 'IMG') {
-        pageContentMap[id] = {
-          type: 'image',
-          src: el.getAttribute('src') || el.src,
-          alt: el.alt || '',
-          style: elStyle
-        };
+        const srcVal = el.getAttribute('src') || el.src || '';
+        if (srcVal.startsWith('data:image/') && srcVal.length > 200000) {
+          if (!pageContentMap[id] || !pageContentMap[id].src) {
+            pageContentMap[id] = { type: 'image', src: 'placeholder.svg', alt: el.alt || '', style: elStyle };
+          }
+        } else {
+          pageContentMap[id] = {
+            type: 'image',
+            src: srcVal,
+            alt: el.alt || '',
+            style: elStyle
+          };
+        }
       } else {
         const itemObj = {
           type: 'text',
@@ -4382,7 +5219,9 @@
 
     // 3. Save Hero Photo/Video & Coverage settings (F1)
     if (pageHeroSettings) {
-      localStorage.setItem(heroStorageKey, JSON.stringify(pageHeroSettings));
+      try {
+        localStorage.setItem(heroStorageKey, JSON.stringify(pageHeroSettings));
+      } catch (e) { }
       pageContentMap['_hero'] = { type: 'hero', data: pageHeroSettings };
     }
 
@@ -4391,14 +5230,25 @@
       const storedNav = localStorage.getItem(CMS_NAV_KEY);
       if (storedNav) {
         const parsedNav = JSON.parse(storedNav);
-        if (Array.isArray(parsedNav)) {
+        if (Array.isArray(parsedNav) && parsedNav.length > 0) {
           globalStyles['_nav'] = parsedNav;
+          try {
+            fetch('/api/save-nav-order', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nav: parsedNav })
+            }).catch(() => { });
+          } catch (e) { }
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     try {
-      localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
+      try {
+        localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
+      } catch (e) {
+        console.warn('[CMS] localStorage content quota notice:', e);
+      }
       const pubBtn = document.getElementById('wp-publish-btn');
       if (pubBtn) {
         pubBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Publishing...';
