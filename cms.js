@@ -53,8 +53,8 @@
     if (typeof value !== 'string') return false;
     const v = value.trim().replace(/[\u0000-\u0020]+/g, '');
     if (!v) return false;
-    if (/^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(v)) return true;
-    if (/^https:\/\//i.test(v)) return true;
+    if (/^data:(?:image\/(?:png|jpe?g|gif|webp)|video\/(?:mp4|webm|ogg));base64,/i.test(v)) return true;
+    if (/^https?:\/\//i.test(v)) return true;
     if (window.location.origin !== 'null' && v.indexOf(window.location.origin + '/') === 0) return true;
     if (/^\/\//.test(v)) return false;
     return !/^[a-z][a-z0-9+.-]*:/i.test(v); // plain relative path such as "photo.jpg" or "/img/a.png"
@@ -105,6 +105,11 @@
     '.wp-card-media-pill',
     '.cms-element-move-pill',
     '.cms-relocate-popover',
+    '.wp-btn-action-bar',
+    '.wp-btn-edit-badge',
+    '.wp-btn-badge-action',
+    '.wp-btn-killed-pill',
+    '.wp-hero-btn-add',
     '.cms-drop-indicator-line',
     '.cms-ignore',
     '.cms-ghost',
@@ -113,7 +118,8 @@
     '.cms-move-btn',
     '.cms-move-menu-toggle',
     '.cms-relocate-item',
-    '.cms-relocate-divider'
+    '.cms-relocate-divider',
+    '.cms-hero-sound-btn'
   ].join(', ');
 
   function getCleanElementHtml(el) {
@@ -128,11 +134,6 @@
     });
     clone.querySelectorAll('[data-cms-card]').forEach((node) => {
       node.removeAttribute('data-cms-card');
-    });
-    clone.querySelectorAll('img[src]').forEach((node) => {
-      if (/^data:image\//i.test(node.getAttribute('src') || '')) {
-        node.removeAttribute('src');
-      }
     });
     clone.querySelectorAll('.cms-dragging, .cms-drop-target-before, .cms-drop-target-after, .cms-move-active').forEach((node) => {
       node.classList.remove('cms-dragging', 'cms-drop-target-before', 'cms-drop-target-after', 'cms-move-active');
@@ -253,16 +254,28 @@
   let globalStyles = {};
   let pageHeroSettings = null;
 
+  function cleanupConflictedCardMedia() {
+    document.querySelectorAll('.leader-card-media, .card-media').forEach((media) => {
+      if (media.querySelector('img, video')) {
+        media.classList.add('has-image');
+        media.querySelectorAll('.leader-avatar-placeholder, .avatar-placeholder, [class*="avatar-placeholder"]').forEach((ph) => ph.remove());
+      }
+    });
+  }
+
   async function initCMS() {
     document.querySelectorAll('.wp-card-media-pill').forEach(p => p.remove());
+    cleanupConflictedCardMedia();
     loadGlobalNavigation();
     loadGlobalStyles();
     loadPageContent();
+    cleanupConflictedCardMedia();
     injectAdminInterface();
     await checkAuthSession();
     setupShortcuts();
     setupEditModeGuards();
     await syncContentFromSupabase();
+    cleanupConflictedCardMedia();
   }
 
   // --- Initializer (handles both standard and lazy dynamic script loading) ---
@@ -407,34 +420,49 @@
         .maybeSingle();
 
       if (!error && data) {
-        data = normalizeEventsRow(data);
-        if (data.grid_data && Object.keys(data.grid_data).length > 0) {
-          if (pagePath === 'events.html') delete data.grid_data.grid_events_1;
-          Object.keys(data.grid_data).forEach((gridId) => {
-            const gridEl = document.querySelector(`[data-cms-grid-id="${gridId}"]`);
-            if (gridEl && data.grid_data[gridId]) {
-              gridEl.innerHTML = sanitizeHtml(data.grid_data[gridId]);
-              // Notify script.js to re-observe any new .reveal / .leader-card nodes
-              gridEl.dispatchEvent(new CustomEvent('cmsGridRestored', { bubbles: true, detail: { gridId } }));
+        let localSavedAt = 0;
+        try {
+          const ts = localStorage.getItem('envision_cms_saved_at_' + pagePath);
+          if (ts) localSavedAt = parseInt(ts, 10) || 0;
+        } catch (e) { }
+
+        const remoteSavedAt = data.updated_at ? new Date(data.updated_at).getTime() : 0;
+        const storedLocal = localStorage.getItem(pageStorageKey);
+        const storedLocalHero = localStorage.getItem(heroStorageKey);
+        const storedLocalGrids = localStorage.getItem(gridStorageKey);
+        const hasLocalEdits = Boolean(storedLocal || storedLocalHero || storedLocalGrids);
+
+        // Only let remote Supabase overwrite if there are NO local edits, or if remote is strictly newer than our local save timestamp
+        if (!hasLocalEdits || (localSavedAt && remoteSavedAt > localSavedAt)) {
+          data = normalizeEventsRow(data);
+          if (data.grid_data && Object.keys(data.grid_data).length > 0) {
+            if (pagePath === 'events.html') delete data.grid_data.grid_events_1;
+            Object.keys(data.grid_data).forEach((gridId) => {
+              const gridEl = document.querySelector(`[data-cms-grid-id="${gridId}"]`);
+              if (gridEl && data.grid_data[gridId]) {
+                gridEl.innerHTML = sanitizeHtml(data.grid_data[gridId]);
+                // Notify script.js to re-observe any new .reveal / .leader-card nodes
+                gridEl.dispatchEvent(new CustomEvent('cmsGridRestored', { bubbles: true, detail: { gridId } }));
+              }
+            });
+            try { localStorage.setItem(gridStorageKey, JSON.stringify(data.grid_data)); } catch (e) { }
+          }
+
+          if (data.content_data && Object.keys(data.content_data).length > 0) {
+            data.content_data = sanitizeEventsContentMap(data.content_data);
+            pageContentMap = sanitizeEventsContentMap({ ...pageContentMap, ...data.content_data });
+            applyPageContent(pageContentMap);
+            try { localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap)); } catch (e) { }
+          }
+
+          if (data.global_styles && Object.keys(data.global_styles).length > 0) {
+            globalStyles = { ...globalStyles, ...data.global_styles };
+            applyGlobalStyles(globalStyles);
+            try { localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles)); } catch (e) { }
+            if (Array.isArray(data.global_styles._nav) && data.global_styles._nav.length > 0) {
+              try { localStorage.setItem(CMS_NAV_KEY, JSON.stringify(data.global_styles._nav)); } catch (e) { }
+              loadGlobalNavigation();
             }
-          });
-          try { localStorage.setItem(gridStorageKey, JSON.stringify(data.grid_data)); } catch (e) { }
-        }
-
-        if (data.content_data && Object.keys(data.content_data).length > 0) {
-          data.content_data = sanitizeEventsContentMap(data.content_data);
-          pageContentMap = sanitizeEventsContentMap({ ...pageContentMap, ...data.content_data });
-          applyPageContent(pageContentMap);
-          try { localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap)); } catch (e) { }
-        }
-
-        if (data.global_styles && Object.keys(data.global_styles).length > 0) {
-          globalStyles = { ...globalStyles, ...data.global_styles };
-          applyGlobalStyles(globalStyles);
-          try { localStorage.setItem(CMS_GLOBAL_STYLES_KEY, JSON.stringify(globalStyles)); } catch (e) { }
-          if (Array.isArray(data.global_styles._nav) && data.global_styles._nav.length > 0) {
-            try { localStorage.setItem(CMS_NAV_KEY, JSON.stringify(data.global_styles._nav)); } catch (e) { }
-            loadGlobalNavigation();
           }
         }
       }
@@ -505,6 +533,8 @@
         }
       }
     });
+
+    cleanupConflictedCardMedia();
   }
 
   const CANONICAL_PAGES = [
@@ -733,7 +763,7 @@
       if (!isEditMode) return;
 
       // Allow clicks on CMS admin controls, ribbon, dialogs, floating toolbars, and card/section builders
-      if (e.target.closest('#wp-admin-bar, #wp-word-ribbon, #wp-sidebar-inspector, .cms-modal-backdrop, #wp-floating-toolbar, #cms-trigger-btn, .wp-card-toolbar, .wp-section-bar, .wp-add-section-divider, .wp-add-card-placeholder, .wp-nav-add-btn, .cms-ignore')) {
+      if (e.target.closest('#wp-admin-bar, #wp-word-ribbon, #wp-sidebar-inspector, .cms-modal-backdrop, #wp-floating-toolbar, #cms-trigger-btn, .wp-card-toolbar, .wp-section-bar, .wp-add-section-divider, .wp-add-card-placeholder, .wp-nav-add-btn, .wp-btn-action-bar, .wp-hero-btn-add, .wp-btn-edit-badge, .cms-hero-sound-btn, .cms-ignore')) {
         return;
       }
 
@@ -742,6 +772,11 @@
       if (interactiveEl) {
         // Stop the browser from navigating away or reloading the page
         e.preventDefault();
+
+        // Trigger floating Button Action Bar for buttons/links in edit mode
+        if (interactiveEl.matches('a, button, .btn') || interactiveEl.closest('.hero-actions') || interactiveEl.tagName === 'A' || interactiveEl.tagName === 'BUTTON') {
+          showButtonActionBar(interactiveEl);
+        }
 
         // Focus the editable text element so the user can immediately place cursor and write
         const editableEl = e.target.closest('[data-cms-editable]') || (interactiveEl.hasAttribute('data-cms-editable') ? interactiveEl : null);
@@ -847,20 +882,25 @@
     });
 
     // Card Row Containers & Grids
-    document.querySelectorAll('.cards-grid, .grid-3, .grid-4, .stat-grid, .faq-accordion').forEach((grid) => {
+    document.querySelectorAll('.cards-grid, .grid-3, .grid-4, .stat-grid, .faq-accordion, .leaders-stream-track').forEach((grid) => {
       if (!grid.getAttribute('data-cms-grid-id')) {
         let gid;
         do { gid = `grid_${pagePath.replace('.html', '')}_${gridCounter++}`; }
         while (document.querySelector(`[data-cms-grid-id="${gid}"]`));
         grid.setAttribute('data-cms-grid-id', gid);
       }
-      attachGridCardInserter(grid);
+      if (!grid.classList.contains('leaders-stream-track')) {
+        attachGridCardInserter(grid);
+      }
     });
 
     // Individual Cards & Grid Items
     document.querySelectorAll('.card, article.card, .leader-card, .faq-item, .stat-box, .cards-grid > article, .cards-grid > div:not(.wp-add-card-placeholder)').forEach((card) => {
       attachCardToolbar(card);
     });
+
+    // Clean up any cards where an image or video exists alongside an avatar placeholder
+    cleanupConflictedCardMedia();
 
     // Remove any legacy card media pills
     document.querySelectorAll('.wp-card-media-pill').forEach((pill) => pill.remove());
@@ -902,6 +942,17 @@
     // Hero Banner Customizer Control
     document.querySelectorAll('.hero, .page-hero, header + main > section:first-of-type, header + section').forEach((hero) => {
       attachHeroControls(hero);
+    });
+
+    // Hero Actions & Button Groups (+ Add Button placeholder)
+    document.querySelectorAll('.hero-actions, .cta-group, .btn-group').forEach((group) => {
+      attachButtonGroupControls(group);
+    });
+
+    // Individual Edit Button on each button
+    document.querySelectorAll('.btn, a.btn, button.btn, .hero-actions > a, .hero-actions > button, .cta-group > a, .btn-primary, .btn-secondary, .btn-outline, .btn-explore, .nav-cta').forEach((btn) => {
+      if (btn.closest(CMS_UI_SELECTOR)) return;
+      attachButtonEditControls(btn);
     });
 
     // Clean up any stray wp-nav-add-btn buttons
@@ -1158,6 +1209,633 @@
     window.addEventListener('mouseup', onPointerUp);
   }
 
+  // ==========================================================================
+  // Button & Page Attachment Management Engine
+  // ==========================================================================
+
+  let activeButtonActionBar = null;
+
+  function hideButtonActionBar() {
+    if (activeButtonActionBar) {
+      activeButtonActionBar.remove();
+      activeButtonActionBar = null;
+    }
+  }
+
+  function getAllSitePages() {
+    const pages = [
+      { file: 'index.html', title: 'Home Page' },
+      { file: 'events.html', title: 'Events & Conclaves' },
+      { file: 'incubation.html', title: 'Incubation Center (INSPIRE)' },
+      { file: 'about.html', title: 'About Envision' },
+      { file: 'contact.html', title: 'Contact & Connect' },
+      { file: 'tedx.html', title: 'TEDx Envision' },
+      { file: 'yes.html', title: 'Youth Entrepreneurship Summit' },
+      { file: 'aic.html', title: 'AIC Incubation Center' },
+      { file: 'odyssey.html', title: 'Odyssey Magazine / Stories' },
+      { file: '404.html', title: '404 Page' },
+      { file: '500.html', title: '500 Page' }
+    ];
+
+    try {
+      const storedNav = localStorage.getItem(CMS_NAV_KEY);
+      if (storedNav) {
+        const navList = JSON.parse(storedNav);
+        if (Array.isArray(navList)) {
+          navList.forEach(item => {
+            const u = (item.url || '').trim();
+            if (u && !u.startsWith('#') && !u.startsWith('http') && !pages.some(p => p.file.toLowerCase() === u.toLowerCase())) {
+              pages.push({ file: u, title: item.title || u });
+            }
+          });
+        }
+      }
+    } catch (e) { }
+
+    document.querySelectorAll('a[href$=".html"]').forEach(a => {
+      const h = a.getAttribute('href');
+      if (h && !h.startsWith('http') && !pages.some(p => p.file.toLowerCase() === h.toLowerCase())) {
+        pages.push({ file: h, title: a.textContent.trim().slice(0, 30) || h });
+      }
+    });
+
+    return pages;
+  }
+
+  function showButtonActionBar(targetBtn) {
+    if (!targetBtn || !isEditMode) return;
+    hideButtonActionBar();
+
+    const bar = document.createElement('div');
+    bar.className = 'wp-btn-action-bar cms-ignore';
+
+    const isKilled = targetBtn.getAttribute('data-btn-killed') === 'true';
+    const href = targetBtn.getAttribute('href') || targetBtn.getAttribute('data-cms-saved-href') || '#';
+    const cleanDisplayHref = href.replace(/^https?:\/\/[^\/]+\//, '').replace(/^\.\//, '') || '#';
+    const displayHref = isKilled ? '⛔ Function Killed' : cleanDisplayHref;
+
+    bar.innerHTML = `
+      <span class="wp-btn-act-tag" title="Attached destination: ${escapeHtml(href)}">
+        <i class="fa-solid ${isKilled ? 'fa-ban' : 'fa-link'}" style="color:${isKilled ? '#ef4444' : 'var(--wp-accent,#c5a059)'}; margin-right:4px;"></i>${escapeHtml(displayHref)}
+      </span>
+      <button type="button" data-act="bar-edit-page" title="Button & Page Settings"><i class="fa-solid fa-pen-to-square"></i> Settings</button>
+      <button type="button" data-act="bar-open-page" title="Open and edit this page's content"><i class="fa-solid fa-arrow-up-right-from-square"></i> Edit Page</button>
+      <button type="button" data-act="bar-kill-btn" title="${isKilled ? 'Restore button function' : 'Kill button function (disable)'}" style="${isKilled ? 'background:#16a34a;' : ''}">
+        <i class="fa-solid ${isKilled ? 'fa-bolt' : 'fa-ban'}"></i> ${isKilled ? 'Restore' : 'Kill Func'}
+      </button>
+      <button type="button" data-act="bar-add-btn" title="Add another button beside this"><i class="fa-solid fa-plus"></i> Add</button>
+      <button type="button" class="danger" data-act="bar-del-page" title="Permanently delete attached HTML page file from website"><i class="fa-solid fa-file-excel"></i> Del Page</button>
+      <button type="button" class="danger" data-act="bar-del-btn" title="Delete this button"><i class="fa-solid fa-trash"></i></button>
+    `;
+
+    bar.querySelector('[data-act="bar-edit-page"]').onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      openButtonPageEditorModal(targetBtn);
+    };
+
+    bar.querySelector('[data-act="bar-open-page"]').onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      editAttachedPage(targetBtn);
+    };
+
+    bar.querySelector('[data-act="bar-kill-btn"]').onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (targetBtn.getAttribute('data-btn-killed') === 'true') {
+        restoreButtonFunction(targetBtn);
+      } else {
+        killButtonFunction(targetBtn);
+      }
+    };
+
+    bar.querySelector('[data-act="bar-add-btn"]').onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      addHeroActionButton(targetBtn);
+    };
+
+    bar.querySelector('[data-act="bar-del-page"]').onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      deleteAttachedPage(targetBtn);
+    };
+
+    bar.querySelector('[data-act="bar-del-btn"]').onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      deleteHeroActionButton(targetBtn);
+    };
+
+    document.body.append(bar);
+    activeButtonActionBar = bar;
+
+    const rect = targetBtn.getBoundingClientRect();
+    const barWidth = 470;
+    let left = rect.left + (rect.width / 2) - (barWidth / 2);
+    if (left < 16) left = 16;
+    if (left + barWidth > window.innerWidth - 16) left = window.innerWidth - barWidth - 16;
+
+    let top = rect.top - 46;
+    if (top < 60) {
+      top = rect.bottom + 8;
+    }
+
+    bar.style.position = 'fixed';
+    bar.style.top = top + 'px';
+    bar.style.left = left + 'px';
+    bar.style.zIndex = '10000040';
+  }
+
+  function addHeroActionButton(targetBtn) {
+    const container = targetBtn ? (targetBtn.closest('.hero-actions, .cta-group, .btn-group') || targetBtn.parentNode) : document.querySelector('.hero-actions');
+    if (!container) {
+      showToast('No button container found.', 'error');
+      return;
+    }
+
+    const newBtn = document.createElement('a');
+    const btnId = `txt_${pagePath.replace('.html', '')}_btn_${Date.now().toString().slice(-4)}`;
+    newBtn.setAttribute('data-cms-id', btnId);
+    newBtn.setAttribute('data-cms-editable', 'true');
+    newBtn.className = 'btn btn-secondary';
+    newBtn.setAttribute('href', 'events.html');
+    newBtn.innerHTML = 'New Action <i class="fa-solid fa-arrow-right"></i>';
+
+    const addBtnPlaceholder = container.querySelector('.wp-hero-btn-add');
+    if (targetBtn && targetBtn.parentNode === container && targetBtn !== addBtnPlaceholder) {
+      container.insertBefore(newBtn, targetBtn.nextSibling);
+    } else if (addBtnPlaceholder) {
+      container.insertBefore(newBtn, addBtnPlaceholder);
+    } else {
+      container.appendChild(newBtn);
+    }
+
+    attachRelocateControls(newBtn);
+    attachButtonEditControls(newBtn);
+    markDirty();
+    showToast('New button added! Customize its page and text.', 'success');
+
+    setTimeout(() => {
+      openButtonPageEditorModal(newBtn);
+    }, 120);
+  }
+
+  function deleteHeroActionButton(targetBtn) {
+    if (!targetBtn) return;
+    const clone = targetBtn.cloneNode(true);
+    clone.querySelectorAll(CMS_UI_SELECTOR).forEach(n => n.remove());
+    const label = clone.textContent.trim().replace(/\s+/g, ' ') || 'this button';
+
+    if (!confirm(`Are you sure you want to delete button "${label}"?`)) return;
+
+    hideButtonActionBar();
+    targetBtn.remove();
+    markDirty();
+    showToast(`Button "${label}" deleted.`, 'success');
+  }
+
+  function attachButtonGroupControls(group) {
+    if (!group) return;
+    if (group.querySelector('.wp-hero-btn-add')) return;
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'wp-hero-btn-add cms-ignore';
+    addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Button';
+    addBtn.title = 'Add another button beside these';
+    addBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const firstBtn = group.querySelector('.btn, a');
+      addHeroActionButton(firstBtn || group);
+    };
+    group.appendChild(addBtn);
+  }
+
+  function editAttachedPage(targetBtn) {
+    if (!targetBtn) return;
+    let href = targetBtn.getAttribute('href') || targetBtn.getAttribute('data-cms-saved-href') || '';
+    href = href.replace(/^https?:\/\/[^\/]+\//, '').replace(/^\.\//, '').trim();
+
+    if (!href || href === '#' || href.startsWith('javascript:')) {
+      showToast('No attached page to edit.', 'warning');
+      return;
+    }
+
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      window.open(href, '_blank');
+      return;
+    }
+
+    const targetUrl = href.includes('?') ? `${href}&edit=1` : `${href}?edit=1`;
+    showToast(`Navigating to edit "${href}"...`, 'info');
+    setTimeout(() => {
+      window.location.href = targetUrl;
+    }, 250);
+  }
+
+  async function deleteAttachedPage(targetBtn) {
+    if (!targetBtn) return;
+    let href = targetBtn.getAttribute('href') || targetBtn.getAttribute('data-cms-saved-href') || '';
+    href = href.replace(/^https?:\/\/[^\/]+\//, '').replace(/^\.\//, '').trim();
+
+    if (!href || href === '#' || href.startsWith('javascript:')) {
+      showToast('No valid attached page to delete.', 'warning');
+      return;
+    }
+
+    if (href.toLowerCase() === 'index.html' || href === '/') {
+      alert('The Home Page (index.html) is the main site page and cannot be deleted.');
+      return;
+    }
+
+    if (!href.toLowerCase().endsWith('.html')) {
+      if (confirm(`Do you want to unlink and remove destination "${href}" from this button?`)) {
+        targetBtn.setAttribute('href', '#');
+        targetBtn.removeAttribute('data-cms-saved-href');
+        markDirty();
+        showToast(`Removed destination "${href}".`, 'success');
+      }
+      return;
+    }
+
+    const confirmed = confirm(
+      `⚠️ PERMANENT PAGE DELETION ⚠️\n\nAre you sure you want to permanently DELETE "${href}" from the website?\n\nThis will delete the HTML file from the server and remove its navigation link across all pages.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch('/api/delete-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: href })
+      });
+
+      if (res.ok) {
+        showToast(`Page "${href}" deleted from website!`, 'success');
+        targetBtn.setAttribute('href', '#');
+        targetBtn.removeAttribute('data-cms-saved-href');
+        markDirty();
+        hideButtonActionBar();
+        document.querySelectorAll('.cms-modal-backdrop').forEach(m => m.remove());
+        if (document.getElementById('wp-sidebar-inspector')?.classList.contains('open')) {
+          syncSidebarInspector(targetBtn);
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(`Delete failed: ${err.error || res.statusText}`, 'error');
+      }
+    } catch (err) {
+      showToast(`Error deleting page: ${err.message}`, 'error');
+    }
+  }
+
+  function killButtonFunction(targetBtn) {
+    if (!targetBtn) return;
+    const currentHref = targetBtn.getAttribute('href') || '#';
+    if (currentHref && !currentHref.startsWith('javascript:')) {
+      targetBtn.setAttribute('data-cms-saved-href', currentHref);
+    }
+    targetBtn.setAttribute('data-btn-killed', 'true');
+    targetBtn.setAttribute('href', 'javascript:void(0);');
+    targetBtn.setAttribute('aria-disabled', 'true');
+    targetBtn.classList.add('btn-killed');
+
+    if (!targetBtn.querySelector('.wp-btn-killed-pill')) {
+      const pill = document.createElement('span');
+      pill.className = 'wp-btn-killed-pill cms-ignore';
+      pill.innerHTML = '<i class="fa-solid fa-ban"></i> Function Killed';
+      targetBtn.appendChild(pill);
+    }
+
+    const killBtn = targetBtn.querySelector('.wp-btn-badge-kill');
+    if (killBtn) {
+      killBtn.className = 'wp-btn-badge-action wp-btn-badge-kill is-killed';
+      killBtn.title = 'Restore button function (reactivate)';
+      killBtn.innerHTML = '<i class="fa-solid fa-bolt"></i>';
+    }
+
+    markDirty();
+    showToast('Button function killed! Button is now disabled and inert.', 'warning');
+    hideButtonActionBar();
+  }
+
+  function restoreButtonFunction(targetBtn) {
+    if (!targetBtn) return;
+    targetBtn.removeAttribute('data-btn-killed');
+    targetBtn.removeAttribute('aria-disabled');
+    targetBtn.classList.remove('btn-killed');
+
+    const savedHref = targetBtn.getAttribute('data-cms-saved-href') || 'events.html';
+    targetBtn.setAttribute('href', savedHref);
+
+    targetBtn.querySelector('.wp-btn-killed-pill')?.remove();
+
+    const killBtn = targetBtn.querySelector('.wp-btn-badge-kill');
+    if (killBtn) {
+      killBtn.className = 'wp-btn-badge-action wp-btn-badge-kill';
+      killBtn.title = 'Kill button function (disable)';
+      killBtn.innerHTML = '<i class="fa-solid fa-ban"></i>';
+    }
+
+    markDirty();
+    showToast('Button function restored! Button is active.', 'success');
+    hideButtonActionBar();
+  }
+
+  function attachButtonEditControls(btn) {
+    if (!btn || btn.classList.contains('wp-hero-btn-add') || btn.closest(CMS_UI_SELECTOR)) return;
+    if (btn.querySelector(':scope > .wp-btn-edit-badge')) return;
+
+    const isKilled = btn.getAttribute('data-btn-killed') === 'true';
+
+    // If button was saved as killed, ensure pill indicator is visible in edit mode
+    if (isKilled && !btn.querySelector('.wp-btn-killed-pill')) {
+      const pill = document.createElement('span');
+      pill.className = 'wp-btn-killed-pill cms-ignore';
+      pill.innerHTML = '<i class="fa-solid fa-ban"></i> Function Killed';
+      btn.appendChild(pill);
+    }
+
+    const badge = document.createElement('div');
+    badge.className = 'wp-btn-edit-badge cms-ignore';
+    badge.setAttribute('contenteditable', 'false');
+    badge.innerHTML = `
+      <button type="button" class="wp-btn-badge-action wp-btn-badge-edit" title="Edit attached page, link destination, text label, or style">
+        <i class="fa-solid fa-pen"></i> Edit
+      </button>
+      <button type="button" class="wp-btn-badge-action wp-btn-badge-kill ${isKilled ? 'is-killed' : ''}" title="${isKilled ? 'Restore button function (reactivate)' : 'Kill button function (disable / make inert)'}">
+        <i class="fa-solid ${isKilled ? 'fa-bolt' : 'fa-ban'}"></i>
+      </button>
+      <button type="button" class="wp-btn-badge-action wp-btn-badge-del" title="Delete this button">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    `;
+
+    badge.addEventListener('mousedown', (e) => e.stopPropagation());
+    badge.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    const editBtn = badge.querySelector('.wp-btn-badge-edit');
+    const killBtn = badge.querySelector('.wp-btn-badge-kill');
+    const delBtn = badge.querySelector('.wp-btn-badge-del');
+
+    editBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openButtonPageEditorModal(btn);
+    };
+
+    killBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (btn.getAttribute('data-btn-killed') === 'true') {
+        restoreButtonFunction(btn);
+      } else {
+        killButtonFunction(btn);
+      }
+    };
+
+    delBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteHeroActionButton(btn);
+    };
+
+    btn.style.position = 'relative';
+    btn.appendChild(badge);
+  }
+
+  function openButtonPageEditorModal(targetBtn) {
+    if (!targetBtn) return;
+    const currentHref = targetBtn.getAttribute('href') || '';
+    const currentTarget = targetBtn.getAttribute('target') || '_self';
+
+    const iconEl = targetBtn.querySelector('i');
+    const currentIconClass = iconEl ? iconEl.className : '';
+    const clone = targetBtn.cloneNode(true);
+    clone.querySelectorAll(CMS_UI_SELECTOR).forEach(n => n.remove());
+    clone.querySelectorAll('i').forEach(n => n.remove());
+    const currentLabel = clone.textContent.trim() || 'Action';
+
+    let currentStyle = 'primary';
+    if (targetBtn.classList.contains('btn-secondary')) currentStyle = 'secondary';
+    else if (targetBtn.classList.contains('btn-outline')) currentStyle = 'outline';
+
+    const pages = getAllSitePages();
+    const isCustomUrl = currentHref && !pages.some(p => p.file.toLowerCase() === currentHref.toLowerCase());
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'cms-modal-backdrop open';
+    backdrop.innerHTML = `
+      <div class="cms-modal-box" style="width: min(580px, 94vw); max-height: 90vh; overflow-y: auto;">
+        <div class="cms-modal-header">
+          <h3 class="cms-modal-title"><i class="fa-solid fa-link" style="color: var(--wp-accent, #c5a059);"></i> Button &amp; Page Settings</h3>
+          <button type="button" class="cms-modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <form id="wp-btn-editor-form">
+          <div class="wp-panel-group" style="margin-bottom: 14px;">
+            <label class="wp-control-label" style="display:block; margin-bottom: 6px; font-weight: 600;">Button Label (Text):</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="wp-btn-label-input" class="wp-input" style="flex:1;" value="${escapeHtml(currentLabel)}" placeholder="e.g. Explore / Incubation Center" required />
+              <select id="wp-btn-icon-select" class="wp-select" style="width:140px;">
+                <option value="none">No Icon</option>
+                <option value="fa-solid fa-arrow-right" ${currentIconClass.includes('arrow-right') ? 'selected' : ''}>➜ Arrow Right</option>
+                <option value="fa-solid fa-rocket" ${currentIconClass.includes('rocket') ? 'selected' : ''}>🚀 Rocket</option>
+                <option value="fa-solid fa-wand-magic-sparkles" ${currentIconClass.includes('sparkles') ? 'selected' : ''}>✨ Sparkles</option>
+                <option value="fa-solid fa-calendar-days" ${currentIconClass.includes('calendar') ? 'selected' : ''}>📅 Calendar</option>
+                <option value="fa-solid fa-fire" ${currentIconClass.includes('fire') ? 'selected' : ''}>🔥 Fire</option>
+                <option value="fa-solid fa-arrow-up-right-from-square" ${currentIconClass.includes('arrow-up-right') ? 'selected' : ''}>↗ External</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="wp-panel-group" style="margin-bottom: 14px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <label class="wp-control-label" style="font-weight: 700; color: #1e293b; margin: 0;">Attached Page / Destination:</label>
+              <button type="button" id="wp-btn-create-new-page-shortcut" class="wp-bar-btn" style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 600; cursor: pointer;">
+                <i class="fa-solid fa-file-circle-plus"></i> + Create New Page
+              </button>
+            </div>
+            
+            <select id="wp-btn-page-dropdown" class="wp-select" style="width: 100%; margin-bottom: 8px;">
+              <option value="">-- Select an Existing Page --</option>
+              ${pages.map(p => `<option value="${escapeHtml(p.file)}" ${p.file.toLowerCase() === currentHref.toLowerCase() ? 'selected' : ''}>📄 ${escapeHtml(p.title)} (${escapeHtml(p.file)})</option>`).join('')}
+              <option value="__custom__" ${isCustomUrl ? 'selected' : ''}>🔗 Custom URL / External Link / Anchor (#)</option>
+            </select>
+
+            <div id="wp-btn-custom-url-wrap" style="display: ${isCustomUrl ? 'block' : 'none'};">
+              <input type="text" id="wp-btn-custom-url-input" class="wp-input" style="width: 100%;" value="${escapeHtml(currentHref)}" placeholder="e.g. #contact, https://..., or page.html" />
+            </div>
+
+            <!-- Page Action Shortcuts: Jump & Edit Page, or Delete Page -->
+            <div style="display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+              <button type="button" id="wp-btn-modal-open-page-btn" class="wp-bar-btn" style="flex:1; background:#0284c7; color:#fff; font-size:11.5px; font-weight:600; padding:6px 10px; border-radius:6px; cursor:pointer;" title="Jump to edit this page's content">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open &amp; Edit Page Content
+              </button>
+              <button type="button" id="wp-btn-modal-delete-page-btn" class="wp-bar-btn" style="background:#fee2e2; color:#b91c1c; font-size:11.5px; font-weight:600; padding:6px 10px; border-radius:6px; cursor:pointer;" title="Permanently delete attached HTML page file from disk">
+                <i class="fa-solid fa-file-circle-xmark"></i> Delete Page from Website
+              </button>
+            </div>
+          </div>
+
+          <!-- Button Function Status & Kill Control -->
+          ${(() => {
+            const isKilled = targetBtn.getAttribute('data-btn-killed') === 'true';
+            return `
+            <div class="wp-panel-group" style="margin-bottom: 14px; background: ${isKilled ? '#fef2f2' : '#f0fdf4'}; padding: 12px; border-radius: 8px; border: 1px solid ${isKilled ? '#fecaca' : '#bbf7d0'};">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: ${isKilled ? '#dc2626' : '#16a34a'};">
+                    <i class="fa-solid ${isKilled ? 'fa-ban' : 'fa-circle-check'}"></i> ${isKilled ? 'Button Function: KILLED (Disabled &amp; Inert)' : 'Button Function: ACTIVE (Clickable Link)'}
+                  </span>
+                  <p style="font-size: 11.5px; color: #64748b; margin: 4px 0 0;">
+                    ${isKilled ? 'Visitors cannot click this button. It is disabled/coming soon.' : 'Button behaves normally and navigates to the attached destination.'}
+                  </p>
+                </div>
+                <button type="button" id="wp-btn-modal-toggle-kill-btn" class="wp-bar-btn" style="background: ${isKilled ? '#16a34a' : '#ea580c'}; color: #fff; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;">
+                  <i class="fa-solid ${isKilled ? 'fa-bolt' : 'fa-ban'}"></i> ${isKilled ? 'Restore Function' : 'Kill Function'}
+                </button>
+              </div>
+            </div>
+            `;
+          })()}
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div>
+              <label class="wp-control-label" style="display:block; margin-bottom: 6px; font-weight: 600;">Button Style:</label>
+              <select id="wp-btn-style-select" class="wp-select" style="width: 100%;">
+                <option value="primary" ${currentStyle === 'primary' ? 'selected' : ''}>Gold Primary (btn-primary)</option>
+                <option value="secondary" ${currentStyle === 'secondary' ? 'selected' : ''}>White Secondary (btn-secondary)</option>
+                <option value="outline" ${currentStyle === 'outline' ? 'selected' : ''}>Gold Outline (btn-outline)</option>
+              </select>
+            </div>
+            <div>
+              <label class="wp-control-label" style="display:block; margin-bottom: 6px; font-weight: 600;">Open Target:</label>
+              <select id="wp-btn-target-select" class="wp-select" style="width: 100%;">
+                <option value="_self" ${currentTarget === '_self' ? 'selected' : ''}>Same Tab (_self)</option>
+                <option value="_blank" ${currentTarget === '_blank' ? 'selected' : ''}>New Tab (_blank)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #e2e8f0; margin-top: 16px;">
+            <div style="display: flex; gap: 8px;">
+              <button type="button" id="wp-btn-modal-delete-btn" class="wp-bar-btn" style="background:#fee2e2; color:#b91c1c; font-size:12px; padding:6px 10px;" title="Delete this button">
+                <i class="fa-solid fa-trash"></i> Delete
+              </button>
+              <button type="button" id="wp-btn-modal-add-beside-btn" class="wp-bar-btn" style="background:#f1f5f9; color:#334155; font-size:12px; padding:6px 10px;" title="Add another button beside this">
+                <i class="fa-solid fa-plus"></i> Add Button Beside
+              </button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="wp-bar-btn wp-modal-cancel" style="background:#f1f5f9; color:#475569;">Cancel</button>
+              <button type="submit" class="wp-bar-btn btn-publish" style="background:var(--wp-primary, #2563eb); color:#fff;"><i class="fa-solid fa-check"></i> Save &amp; Apply</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const pageDropdown = backdrop.querySelector('#wp-btn-page-dropdown');
+    const customUrlWrap = backdrop.querySelector('#wp-btn-custom-url-wrap');
+    const customUrlInput = backdrop.querySelector('#wp-btn-custom-url-input');
+
+    pageDropdown.addEventListener('change', () => {
+      if (pageDropdown.value === '__custom__') {
+        customUrlWrap.style.display = 'block';
+        customUrlInput.focus();
+      } else {
+        customUrlWrap.style.display = 'none';
+        if (pageDropdown.value) customUrlInput.value = pageDropdown.value;
+      }
+    });
+
+    backdrop.querySelector('#wp-btn-create-new-page-shortcut').onclick = () => {
+      backdrop.remove();
+      openNewPageModal('content', targetBtn);
+    };
+
+    backdrop.querySelector('#wp-btn-modal-add-beside-btn').onclick = () => {
+      backdrop.remove();
+      addHeroActionButton(targetBtn);
+    };
+
+    backdrop.querySelector('#wp-btn-modal-delete-btn').onclick = () => {
+      backdrop.remove();
+      deleteHeroActionButton(targetBtn);
+    };
+
+    backdrop.querySelector('#wp-btn-modal-open-page-btn')?.addEventListener('click', () => {
+      backdrop.remove();
+      editAttachedPage(targetBtn);
+    });
+
+    backdrop.querySelector('#wp-btn-modal-delete-page-btn')?.addEventListener('click', () => {
+      deleteAttachedPage(targetBtn);
+    });
+
+    backdrop.querySelector('#wp-btn-modal-toggle-kill-btn')?.addEventListener('click', () => {
+      if (targetBtn.getAttribute('data-btn-killed') === 'true') {
+        restoreButtonFunction(targetBtn);
+      } else {
+        killButtonFunction(targetBtn);
+      }
+      backdrop.remove();
+      openButtonPageEditorModal(targetBtn);
+    });
+
+    backdrop.querySelector('.cms-modal-close').onclick = () => backdrop.remove();
+    backdrop.querySelector('.wp-modal-cancel').onclick = () => backdrop.remove();
+
+    backdrop.querySelector('#wp-btn-editor-form').onsubmit = (e) => {
+      e.preventDefault();
+      const label = backdrop.querySelector('#wp-btn-label-input').value.trim();
+      const iconClass = backdrop.querySelector('#wp-btn-icon-select').value;
+      let finalUrl = pageDropdown.value;
+      if (finalUrl === '__custom__' || !finalUrl) {
+        finalUrl = customUrlInput.value.trim() || '#';
+      }
+      const btnStyle = backdrop.querySelector('#wp-btn-style-select').value;
+      const targetVal = backdrop.querySelector('#wp-btn-target-select').value;
+
+      targetBtn.setAttribute('href', finalUrl);
+      if (targetVal === '_blank') targetBtn.setAttribute('target', '_blank');
+      else targetBtn.removeAttribute('target');
+
+      targetBtn.classList.remove('btn-primary', 'btn-secondary', 'btn-outline', 'btn-explore');
+      if (btnStyle === 'primary') {
+        targetBtn.classList.add('btn', 'btn-primary', 'btn-explore');
+      } else if (btnStyle === 'outline') {
+        targetBtn.classList.add('btn', 'btn-outline');
+      } else {
+        targetBtn.classList.add('btn', 'btn-secondary');
+      }
+
+      let iconHtml = '';
+      if (iconClass !== 'none') {
+        iconHtml = ` <i class="${iconClass}"></i>`;
+      }
+      targetBtn.innerHTML = escapeHtml(label) + iconHtml;
+      attachButtonEditControls(targetBtn);
+
+      const id = targetBtn.getAttribute('data-cms-id');
+      if (id) {
+        pageContentMap[id] = { type: 'text', html: targetBtn.innerHTML };
+      }
+
+      markDirty();
+      showToast('Button & attached page updated!', 'success');
+      backdrop.remove();
+      hideButtonActionBar();
+    };
+
+    document.body.append(backdrop);
+  }
+
+
   // --- Universal Element Relocate & Move Handle Controller ---
   function attachRelocateControls(el) {
     if (!el || el.closest('.card, .leader-card, .faq-item, .stat-box') || el.querySelector(':scope > .cms-element-move-pill')) return;
@@ -1187,9 +1865,29 @@
       e.preventDefault();
       closeAllRelocatePopovers();
 
+      const isBtnOrLink = el.matches('a, button, .btn, .btn-primary, .btn-secondary, .btn-outline') ||
+        !!el.closest('.hero-actions') ||
+        el.tagName === 'A' ||
+        el.tagName === 'BUTTON';
+
+      const btnOptionsHtml = isBtnOrLink ? `
+        <div style="padding: 6px 10px 4px; font-size: 10px; font-weight: 700; color: #c5a059; text-transform: uppercase; letter-spacing: 0.06em; display: flex; align-items: center; gap: 5px;">
+          <i class="fa-solid fa-bullseye"></i> Button &amp; Page Options
+        </div>
+        <button type="button" class="cms-relocate-item" data-act="btn-edit-page"><i class="fa-solid fa-link" style="color:#38bdf8;"></i> Settings &amp; Destination...</button>
+        <button type="button" class="cms-relocate-item" data-act="btn-jump-page"><i class="fa-solid fa-arrow-up-right-from-square" style="color:#0284c7;"></i> Open &amp; Edit Attached Page</button>
+        <button type="button" class="cms-relocate-item" data-act="btn-create-page"><i class="fa-solid fa-file-circle-plus" style="color:#4ade80;"></i> Create &amp; Attach New Page...</button>
+        <button type="button" class="cms-relocate-item" data-act="btn-toggle-kill"><i class="fa-solid ${el.getAttribute('data-btn-killed') === 'true' ? 'fa-bolt' : 'fa-ban'}" style="color:${el.getAttribute('data-btn-killed') === 'true' ? '#4ade80' : '#fb923c'};"></i> ${el.getAttribute('data-btn-killed') === 'true' ? 'Restore Button Function' : 'Kill Button Function (Disable)'}</button>
+        <button type="button" class="cms-relocate-item" data-act="btn-add-beside"><i class="fa-solid fa-plus" style="color:#fbbf24;"></i> Add Button Beside This</button>
+        <button type="button" class="cms-relocate-item danger" data-act="btn-del-page"><i class="fa-solid fa-file-circle-xmark" style="color:#ef4444;"></i> Delete Attached Page from Site...</button>
+        <button type="button" class="cms-relocate-item danger" data-act="btn-del-btn"><i class="fa-solid fa-trash" style="color:#ef4444;"></i> Delete This Button</button>
+        <div class="cms-relocate-divider"></div>
+      ` : '';
+
       const popover = document.createElement('div');
       popover.className = 'cms-relocate-popover';
       popover.innerHTML = `
+        ${btnOptionsHtml}
         <button type="button" class="cms-relocate-item" data-act="reset-pos"><i class="fa-solid fa-rotate-left"></i> Reset Canvas Position</button>
         <div class="cms-relocate-divider"></div>
         <button type="button" class="cms-relocate-item" data-act="move-up"><i class="fa-solid fa-arrow-up"></i> Move Up / Before</button>
@@ -1204,6 +1902,49 @@
         <button type="button" class="cms-relocate-item" data-act="dup"><i class="fa-solid fa-clone"></i> Duplicate Element</button>
         <button type="button" class="cms-relocate-item danger" data-act="del"><i class="fa-solid fa-trash"></i> Delete Element</button>
       `;
+
+      // Wire Button & Attached Page actions
+      if (isBtnOrLink) {
+        popover.querySelector('[data-act="btn-edit-page"]')?.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          popover.remove();
+          openButtonPageEditorModal(el);
+        });
+        popover.querySelector('[data-act="btn-jump-page"]')?.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          popover.remove();
+          editAttachedPage(el);
+        });
+        popover.querySelector('[data-act="btn-create-page"]')?.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          popover.remove();
+          openNewPageModal('content', el);
+        });
+        popover.querySelector('[data-act="btn-toggle-kill"]')?.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          popover.remove();
+          if (el.getAttribute('data-btn-killed') === 'true') {
+            restoreButtonFunction(el);
+          } else {
+            killButtonFunction(el);
+          }
+        });
+        popover.querySelector('[data-act="btn-del-page"]')?.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          popover.remove();
+          deleteAttachedPage(el);
+        });
+        popover.querySelector('[data-act="btn-add-beside"]')?.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          popover.remove();
+          addHeroActionButton(el);
+        });
+        popover.querySelector('[data-act="btn-del-btn"]')?.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          popover.remove();
+          deleteHeroActionButton(el);
+        });
+      }
 
       // Reset Free Canvas Position
       popover.querySelector('[data-act="reset-pos"]').onclick = (ev) => {
@@ -1333,7 +2074,7 @@
       }
 
       // Flip vertical if extending past bottom edge
-      const estimatedHeight = 380;
+      const estimatedHeight = isBtnOrLink ? 640 : 380;
       if (top + estimatedHeight > window.innerHeight - 16) {
         top = Math.max(16, rect.top - estimatedHeight - 6);
       }
@@ -1357,14 +2098,19 @@
     if (!e.target.closest('.cms-element-move-pill') && !e.target.closest('.cms-relocate-popover')) {
       closeAllRelocatePopovers();
     }
+    if (!e.target.closest('.wp-btn-action-bar') && !e.target.closest('a, button, .btn')) {
+      hideButtonActionBar();
+    }
   });
 
   window.addEventListener('scroll', () => {
     if (activeRelocateMenu) closeAllRelocatePopovers();
+    if (activeButtonActionBar) hideButtonActionBar();
   }, { passive: true });
 
   window.addEventListener('resize', () => {
     if (activeRelocateMenu) closeAllRelocatePopovers();
+    if (activeButtonActionBar) hideButtonActionBar();
   });
 
   // Modal to move element into any section on the page
@@ -1645,6 +2391,9 @@
 
   function setEditMode(enable) {
     isEditMode = enable;
+    try {
+      sessionStorage.setItem('envision_cms_edit_mode', enable ? 'true' : 'false');
+    } catch (e) { }
     document.body.classList.toggle('cms-edit-mode', enable);
     document.body.classList.toggle('has-word-ribbon', enable && isRibbonVisible);
 
@@ -1700,6 +2449,7 @@
       pageContentMap[id].html = getCleanElementHtml(el);
       try {
         localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
+        localStorage.setItem('envision_cms_saved_at_' + pagePath, Date.now().toString());
       } catch (err) { }
     }
   }
@@ -1742,12 +2492,22 @@
 
   const onImageClick = onCardMediaClick;
 
+  let autoSaveTimeout = null;
   function markDirty() {
     const pubBtn = document.getElementById('wp-publish-btn');
     if (pubBtn) {
       pubBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Publish Changes *';
       pubBtn.classList.add('btn-publish');
     }
+    try {
+      localStorage.setItem('envision_cms_saved_at_' + pagePath, Date.now().toString());
+    } catch (e) { }
+
+    // Auto-save changes safely in the background
+    if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(() => {
+      saveAllChanges(false);
+    }, 2000);
   }
 
   // ==========================================================================
@@ -1756,6 +2516,9 @@
 
   function toggleWordRibbon() {
     isRibbonVisible = !isRibbonVisible;
+    try {
+      sessionStorage.setItem('envision_cms_ribbon_visible', isRibbonVisible ? 'true' : 'false');
+    } catch (e) { }
     const ribbon = document.getElementById('wp-word-ribbon');
     const btn = document.getElementById('wp-toggle-ribbon');
     if (ribbon) ribbon.classList.toggle('cms-visible', isRibbonVisible && isEditMode);
@@ -2168,15 +2931,40 @@
 
     const linkPanel = document.getElementById('wp-insp-link-panel');
     const linkInput = document.getElementById('wp-insp-link');
-    const parentLink = el.tagName === 'A' ? el : el.closest('a');
+    const pageSelect = document.getElementById('wp-insp-page-select');
+    const createPageBtn = document.getElementById('wp-insp-btn-create-page');
+    const addBtnBtn = document.getElementById('wp-insp-btn-add-button');
+    const delBtnBtn = document.getElementById('wp-insp-btn-del-button');
+    const parentLink = (el.tagName === 'A' || el.tagName === 'BUTTON' || el.classList.contains('btn')) ? el : el.closest('a');
+
     if (linkPanel && linkInput) {
       if (parentLink) {
         linkPanel.style.display = 'block';
-        linkInput.value = parentLink.getAttribute('href') || '';
+        const currentHref = parentLink.getAttribute('href') || '';
+        linkInput.value = currentHref;
+
+        if (pageSelect) {
+          const pages = getAllSitePages();
+          pageSelect.innerHTML = '<option value="">(Custom / Select Page)</option>' +
+            pages.map(p => `<option value="${escapeHtml(p.file)}" ${p.file.toLowerCase() === currentHref.toLowerCase() ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('');
+          pageSelect.onchange = (e) => {
+            if (e.target.value) {
+              parentLink.setAttribute('href', e.target.value);
+              linkInput.value = e.target.value;
+              markDirty();
+            }
+          };
+        }
+
         linkInput.oninput = (e) => {
           parentLink.setAttribute('href', e.target.value);
+          if (pageSelect) pageSelect.value = e.target.value;
           markDirty();
         };
+
+        if (createPageBtn) createPageBtn.onclick = () => openNewPageModal('content', parentLink);
+        if (addBtnBtn) addBtnBtn.onclick = () => addHeroActionButton(parentLink);
+        if (delBtnBtn) delBtnBtn.onclick = () => deleteHeroActionButton(parentLink);
       } else {
         linkPanel.style.display = 'none';
       }
@@ -2822,7 +3610,7 @@ ${mainContent}
 </html>`;
   }
 
-  function openNewPageModal(defaultTemplate = 'content') {
+  function openNewPageModal(defaultTemplate = 'content', targetButtonToAttach = null) {
     const backdrop = document.createElement('div');
     backdrop.className = 'cms-modal-backdrop open';
     backdrop.innerHTML = `
@@ -2834,6 +3622,10 @@ ${mainContent}
         <p style="font-size: 13px; color: #64748b; margin: 0 0 16px;">
           Create a new HTML page with the exact same theme, fonts, headers, and footer across your website.
         </p>
+        ${targetButtonToAttach ? `
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:14px; display:flex; align-items:center; gap:6px;">
+          <i class="fa-solid fa-link"></i> Will automatically attach to button: <strong>${escapeHtml(targetButtonToAttach.textContent.trim().slice(0, 30))}</strong>
+        </div>` : ''}
         <form id="wp-new-page-form">
           <div class="wp-panel-group" style="margin-bottom: 12px;">
             <label class="wp-control-label" style="display:block; margin-bottom: 6px; font-weight: 600;">Page Title:</label>
@@ -3021,6 +3813,15 @@ ${mainContent}
       if (addToNav) {
         localStorage.setItem(CMS_NAV_KEY, JSON.stringify(navList));
         loadGlobalNavigation();
+      }
+
+      if (targetButtonToAttach) {
+        targetButtonToAttach.setAttribute('href', filename);
+        markDirty();
+        showToast(`Created "${filename}" and linked button to it!`, 'success');
+        if (document.getElementById('wp-sidebar-inspector')?.classList.contains('open')) {
+          syncSidebarInspector(targetButtonToAttach);
+        }
       }
 
       backdrop.remove();
@@ -3390,7 +4191,7 @@ ${mainContent}
     backdrop.innerHTML = `
       <div class="cms-modal-box cms-theme-modal-box">
         <div class="cms-modal-header">
-          <h3 class="cms-modal-title"><i class="fa-solid fa-palette" style="color:var(--wp-accent);"></i> Website Theme Studio &amp; Customizer</h3>
+          <h3 class="cms-modal-title"><i class="fa-solid fa-palette" style="color:var(--wp-accent);"></i> Website Theme Customizer</h3>
           <button type="button" class="cms-modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
@@ -3655,10 +4456,6 @@ ${mainContent}
     bar.className = 'cms-hidden';
     bar.innerHTML = `
       <div class="wp-bar-left">
-        <div class="wp-bar-brand">
-          <i class="fa-brands fa-wordpress"></i>
-          <span>Envision Visual Studio</span>
-        </div>
         <div class="wp-bar-dropdown">
           <button type="button" class="wp-bar-btn"><i class="fa-solid fa-plus"></i> New <i class="fa-solid fa-caret-down" style="font-size:10px;"></i></button>
           <div class="wp-dropdown-menu">
@@ -3673,12 +4470,12 @@ ${mainContent}
         <button type="button" class="wp-bar-btn active" id="wp-toggle-ribbon"><i class="fa-solid fa-file-word"></i> Word Ribbon</button>
         <button type="button" class="wp-bar-btn" id="wp-toggle-inspector"><i class="fa-solid fa-sliders"></i> Element Inspector</button>
         <button type="button" class="wp-bar-btn" id="wp-hero-media-btn"><i class="fa-solid fa-photo-film"></i> Hero Media</button>
-        <button type="button" class="wp-bar-btn" id="wp-global-styles-btn"><i class="fa-solid fa-palette"></i> Theme Studio</button>
+        <button type="button" class="wp-bar-btn" id="wp-global-styles-btn"><i class="fa-solid fa-palette"></i> Themes</button>
         <button type="button" class="wp-bar-btn" id="wp-nav-manager-btn"><i class="fa-solid fa-bars"></i> Menus &amp; Tabs</button>
         <button type="button" class="wp-bar-btn" id="wp-security-vault-btn" title="Passkey Security &amp; Session Management"><i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Security Vault</button>
         <button type="button" class="wp-bar-btn btn-publish" id="wp-publish-btn"><i class="fa-solid fa-cloud-arrow-up"></i> Publish Changes</button>
         <button type="button" class="wp-bar-btn" id="wp-export-btn" title="Download clean updated HTML"><i class="fa-solid fa-download"></i> Export HTML</button>
-        <button type="button" class="wp-bar-btn" id="wp-logout-btn" title="Exit Visual Studio"><i class="fa-solid fa-right-from-bracket"></i></button>
+        <button type="button" class="wp-bar-btn" id="wp-logout-btn" title="Exit Admin Mode"><i class="fa-solid fa-right-from-bracket"></i></button>
       </div>
     `;
     document.body.prepend(bar);
@@ -3913,8 +4710,8 @@ ${mainContent}
         <div class="word-group word-group-studio">
           <div class="word-group-content">
             <div class="word-row">
-              <button type="button" class="word-btn" id="word-theme-btn" style="padding:2px 8px; font-weight:600; color:#fbbf24;" title="Open Website Theme Studio &amp; Presets">
-                <i class="fa-solid fa-palette"></i> Theme Studio
+              <button type="button" class="word-btn" id="word-theme-btn" style="padding:2px 8px; font-weight:600; color:#fbbf24;" title="Open Website Themes &amp; Presets">
+                <i class="fa-solid fa-palette"></i> Themes
               </button>
               <button type="button" class="word-btn" id="word-relocate-btn" style="padding:2px 8px; font-weight:600; color:#60a5fa;" title="Toggle Relocate &amp; Move Handles Mode">
                 <i class="fa-solid fa-arrows-up-down-left-right"></i> Relocate Tool
@@ -3930,7 +4727,7 @@ ${mainContent}
             </div>
           </div>
           <div class="word-group-footer">
-            <span>Studio Tools</span>
+            <span>Design Tools</span>
           </div>
         </div>
       </div>
@@ -4137,8 +4934,19 @@ ${mainContent}
           <div class="wp-panel-group" id="wp-insp-link-panel" style="display:none;">
             <div class="wp-panel-heading">Link / Button Destination</div>
             <div class="wp-control-row">
+              <span class="wp-control-label">Attached Page:</span>
+              <select id="wp-insp-page-select" class="wp-select" style="max-width:140px;">
+                <option value="">(Custom or Select)</option>
+              </select>
+            </div>
+            <div class="wp-control-row">
               <span class="wp-control-label">URL (href):</span>
-              <input type="text" id="wp-insp-link" class="wp-input" style="width:160px;" placeholder="events.html or https://..." />
+              <input type="text" id="wp-insp-link" class="wp-input" style="width:140px;" placeholder="events.html or https://..." />
+            </div>
+            <div style="display:flex; gap:5px; margin-top:8px;">
+              <button type="button" id="wp-insp-btn-create-page" class="wp-bar-btn" style="flex:1; font-size:11px; padding:4px 6px; background:#10b981; color:#fff;" title="Create new HTML page and link"><i class="fa-solid fa-plus"></i> New Page</button>
+              <button type="button" id="wp-insp-btn-add-button" class="wp-bar-btn" style="flex:1; font-size:11px; padding:4px 6px; background:var(--wp-primary,#2563eb); color:#fff;" title="Add another button beside"><i class="fa-solid fa-square-plus"></i> Add Btn</button>
+              <button type="button" id="wp-insp-btn-del-button" class="wp-bar-btn" style="font-size:11px; padding:4px 6px; background:#ef4444; color:#fff;" title="Delete this button"><i class="fa-solid fa-trash"></i></button>
             </div>
           </div>
         </div>
@@ -4270,6 +5078,7 @@ ${mainContent}
     if (!heroEl || !settings) return;
     heroEl.style.position = 'relative';
     heroEl.style.overflow = 'hidden';
+    heroEl.classList.add('has-cms-media');
 
     // 1. Ensure or create media wrap container
     let wrap = heroEl.querySelector('.cms-hero-media-wrap');
@@ -4279,8 +5088,8 @@ ${mainContent}
       heroEl.prepend(wrap);
     }
 
-    // Clean old media elements inside wrap
-    wrap.innerHTML = '';
+    // Clean any legacy/static direct child media elements outside wrap
+    heroEl.querySelectorAll(':scope > video, :scope > img.page-hero-img').forEach(el => el.remove());
 
     const widthVal = settings.width !== undefined ? Number(settings.width) : 100;
     const heightVal = settings.height !== undefined ? settings.height : 100;
@@ -4294,28 +5103,85 @@ ${mainContent}
     wrap.style.width = pos === 'full' ? '100%' : `${widthVal}%`;
     wrap.style.height = `${heightVal}%`;
     wrap.style.opacity = opacityVal.toString();
-    wrap.style.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none';
+
+    // Immediately and cleanly clear or apply blur
+    if (blurPx > 0) {
+      wrap.style.filter = `blur(${blurPx}px)`;
+      wrap.style.webkitFilter = `blur(${blurPx}px)`;
+    } else {
+      wrap.style.filter = 'none';
+      wrap.style.webkitFilter = 'none';
+      wrap.style.removeProperty('filter');
+      wrap.style.removeProperty('-webkit-filter');
+    }
 
     // 2. Create Video or Image
     if (settings.type === 'video') {
-      const video = document.createElement('video');
-      video.className = 'cms-hero-media-el';
-      video.autoplay = true;
-      video.muted = true;
-      video.loop = true;
-      video.playsInline = true;
-      video.setAttribute('aria-hidden', 'true');
+      let video = wrap.querySelector('video');
+      if (!video || video.getAttribute('data-src') !== settings.src) {
+        wrap.innerHTML = '';
+        video = document.createElement('video');
+        video.className = 'cms-hero-media-el';
+        video.autoplay = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.muted = settings.muted !== false;
+        video.defaultMuted = settings.muted !== false;
+        if (settings.muted !== false) {
+          video.setAttribute('muted', '');
+        } else {
+          video.removeAttribute('muted');
+        }
+        video.setAttribute('playsinline', '');
+        video.setAttribute('autoplay', '');
+        video.setAttribute('loop', '');
+        video.setAttribute('aria-hidden', 'true');
+        video.removeAttribute('poster');
+        video.src = settings.src;
+        video.setAttribute('data-src', settings.src);
+        wrap.append(video);
+      }
       video.style.objectFit = fit;
-      video.src = settings.src;
-      wrap.append(video);
-      video.play().catch(() => { });
+      video.muted = settings.muted !== false;
+      video.defaultMuted = settings.muted !== false;
+      if (settings.muted !== false) {
+        video.setAttribute('muted', '');
+      } else {
+        video.removeAttribute('muted');
+      }
+      video.removeAttribute('poster');
+      const volNum = typeof settings.volume === 'number' ? settings.volume : 80;
+      video.volume = Math.max(0, Math.min(1, volNum / 100));
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          if (!video.muted) {
+            video.muted = true;
+            video.setAttribute('muted', '');
+            video.play().catch(() => { });
+          }
+        });
+      }
+
+      // Ensure no floating sound button is rendered
+      const oldSoundBtn = heroEl.querySelector(':scope > .cms-hero-sound-btn');
+      if (oldSoundBtn) oldSoundBtn.remove();
+      heroEl.querySelectorAll('.cms-hero-sound-btn').forEach(b => b.remove());
     } else {
-      const img = document.createElement('img');
-      img.className = 'cms-hero-media-el';
-      img.src = settings.src;
+      const oldSoundBtn = heroEl.querySelector(':scope > .cms-hero-sound-btn');
+      if (oldSoundBtn) oldSoundBtn.remove();
+      heroEl.querySelectorAll('.cms-hero-sound-btn').forEach(b => b.remove());
+
+      let img = wrap.querySelector('img');
+      if (!img || img.src !== settings.src) {
+        wrap.innerHTML = '';
+        img = document.createElement('img');
+        img.className = 'cms-hero-media-el';
+        img.src = settings.src;
+        wrap.append(img);
+      }
       img.alt = settings.alt || 'Hero background media';
       img.style.objectFit = fit;
-      wrap.append(img);
     }
 
     // 3. Ensure overlay layer for text contrast
@@ -4327,6 +5193,11 @@ ${mainContent}
     }
     const overlayType = settings.overlay || 'vignette';
     overlay.className = `cms-hero-overlay overlay-${overlayType}`;
+    if (overlayType === 'none') {
+      overlay.style.display = 'none';
+    } else {
+      overlay.style.display = '';
+    }
 
     // 4. Ensure hero content sits above media
     const content = heroEl.querySelector('.hero-content, .page-hero-inner, .container');
@@ -4340,17 +5211,21 @@ ${mainContent}
   }
 
   function attachHeroControls(heroEl) {
-    if (heroEl.querySelector(':scope > .wp-hero-edit-pill')) return;
-    const pill = document.createElement('button');
-    pill.type = 'button';
-    pill.className = 'wp-hero-edit-pill';
-    pill.title = 'Customize Hero Photo/Video, Size, and Page Coverage';
-    pill.innerHTML = `<i class="fa-solid fa-photo-film"></i> Customize Hero Media &amp; Coverage`;
-    pill.onclick = (e) => {
-      e.stopPropagation();
-      openHeroMediaModal(heroEl);
-    };
-    heroEl.append(pill);
+    if (!heroEl.querySelector(':scope > .wp-hero-edit-pill')) {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'wp-hero-edit-pill';
+      pill.title = 'Customize Hero Photo/Video, Size, and Page Coverage';
+      pill.innerHTML = `<i class="fa-solid fa-photo-film"></i> Customize Hero Media &amp; Coverage`;
+      pill.onclick = (e) => {
+        e.stopPropagation();
+        openHeroMediaModal(heroEl);
+      };
+      heroEl.append(pill);
+    }
+
+    // Clean up any lingering floating sound buttons
+    heroEl.querySelectorAll('.cms-hero-sound-btn').forEach(b => b.remove());
   }
 
   function openHeroMediaModal(targetHero) {
@@ -4372,8 +5247,15 @@ ${mainContent}
       opacity: 0.35,
       objectFit: 'cover',
       overlay: 'vignette',
-      blur: 0
+      blur: 0,
+      muted: true,
+      volume: 80,
+      showSoundButton: true
     };
+
+    if (current.muted === undefined) current.muted = true;
+    if (current.volume === undefined) current.volume = 80;
+    if (current.showSoundButton === undefined) current.showSoundButton = true;
 
     let temp = { ...current };
 
@@ -4382,7 +5264,7 @@ ${mainContent}
     backdrop.innerHTML = `
       <div class="cms-modal-box" style="width: min(740px, 94vw);">
         <div class="cms-modal-header">
-          <h3 class="cms-modal-title"><i class="fa-solid fa-photo-film" style="color: var(--wp-primary);"></i> Hero Photo/Video &amp; Coverage Studio</h3>
+          <h3 class="cms-modal-title"><i class="fa-solid fa-photo-film" style="color: var(--wp-primary);"></i> Hero Media &amp; Coverage</h3>
           <button type="button" class="cms-modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
@@ -4400,7 +5282,7 @@ ${mainContent}
             </div>
           </div>
 
-          <!-- 2. Source URL or Local File -->
+          <!-- 2. Media Source (Web URL or Upload) -->
           <div class="wp-panel-group">
             <label class="wp-control-label" style="display:block; margin-bottom: 6px;">2. Media Source (Web URL or Upload):</label>
             <input type="text" id="wp-hero-url-input" class="wp-input" style="width:100%; margin-bottom:8px;" value="${escapeHtml(temp.src || '')}" placeholder="https://example.com/video.mp4 or https://images.unsplash.com/..." />
@@ -4472,9 +5354,35 @@ ${mainContent}
             </div>
           </div>
 
+          <!-- 4. Video Sound & Audio Adjustments (Active for Videos) -->
+          <div class="wp-panel-group" id="wp-hero-sound-group" style="${temp.type === 'video' ? '' : 'display:none;'}">
+            <div class="wp-panel-heading"><i class="fa-solid fa-volume-high" style="color: var(--wp-primary);"></i> 4. Video Sound &amp; Audio Controls</div>
+            
+            <div class="wp-control-row">
+              <span class="wp-control-label">Sound Mode:</span>
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="wp-bar-btn wp-sound-mode-btn ${temp.muted !== false ? 'active' : ''}" data-sound="muted">
+                  <i class="fa-solid fa-volume-xmark"></i> Silent Loop (Muted)
+                </button>
+                <button type="button" class="wp-bar-btn wp-sound-mode-btn ${temp.muted === false ? 'active' : ''}" data-sound="unmuted">
+                  <i class="fa-solid fa-volume-high"></i> Sound Enabled
+                </button>
+              </div>
+            </div>
+
+            <div class="wp-control-row">
+              <span class="wp-control-label">Volume Level (<span id="wp-hero-volume-val">${escapeHtml(temp.volume !== undefined ? temp.volume : 80)}%</span>):</span>
+              <div style="display:flex; align-items:center; gap:10px; flex:1; max-width:260px;">
+                <i class="fa-solid fa-volume-low" style="font-size:12px; color:#64748b;"></i>
+                <input type="range" id="wp-hero-volume-slider" min="0" max="100" step="5" value="${escapeHtml(temp.volume !== undefined ? temp.volume : 80)}" style="flex:1;" />
+                <i class="fa-solid fa-volume-high" style="font-size:12px; color:#64748b;"></i>
+              </div>
+            </div>
+          </div>
+
           <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-            <button type="button" class="wp-bar-btn wp-modal-cancel" style="background:#f1f5f9; color:#475569;">Cancel</button>
-            <button type="submit" class="wp-bar-btn btn-publish"><i class="fa-solid fa-check"></i> Save &amp; Apply Media</button>
+            <button type="button" class="wp-bar-btn wp-modal-cancel" style="background:#f1f5f9; color:#475569; cursor:pointer;">Cancel</button>
+            <button type="button" id="wp-hero-save-btn" class="wp-bar-btn btn-publish" style="cursor:pointer; pointer-events:auto; font-weight:700;"><i class="fa-solid fa-check"></i> Save &amp; Apply Media</button>
           </div>
         </form>
       </div>
@@ -4489,12 +5397,18 @@ ${mainContent}
       backdrop.remove();
     };
 
+    const updateSoundGroupVisibility = () => {
+      const soundGroup = backdrop.querySelector('#wp-hero-sound-group');
+      if (soundGroup) soundGroup.style.display = temp.type === 'video' ? '' : 'none';
+    };
+
     // Type toggles
     backdrop.querySelectorAll('.wp-media-type-btn').forEach((btn) => {
       btn.onclick = () => {
         backdrop.querySelectorAll('.wp-media-type-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         temp.type = btn.getAttribute('data-type');
+        updateSoundGroupVisibility();
         applyHeroMedia(heroEl, temp);
       };
     });
@@ -4509,6 +5423,7 @@ ${mainContent}
         backdrop.querySelectorAll('.wp-media-type-btn').forEach(b => {
           b.classList.toggle('active', b.getAttribute('data-type') === temp.type);
         });
+        updateSoundGroupVisibility();
         applyHeroMedia(heroEl, temp);
       };
     });
@@ -4517,6 +5432,13 @@ ${mainContent}
     const urlInput = backdrop.querySelector('#wp-hero-url-input');
     urlInput.oninput = (e) => {
       temp.src = e.target.value.trim();
+      if (temp.src.match(/\.(mp4|webm)(\?.*)?$/i)) {
+        temp.type = 'video';
+        backdrop.querySelectorAll('.wp-media-type-btn').forEach(b => {
+          b.classList.toggle('active', b.getAttribute('data-type') === 'video');
+        });
+        updateSoundGroupVisibility();
+      }
       applyHeroMedia(heroEl, temp);
     };
 
@@ -4557,39 +5479,154 @@ ${mainContent}
     const blurSlider = backdrop.querySelector('#wp-hero-blur-slider');
     const blurVal = backdrop.querySelector('#wp-hero-blur-val');
     blurSlider.oninput = (e) => {
-      temp.blur = Number(e.target.value);
+      temp.blur = Math.max(0, Number(e.target.value) || 0);
       if (blurVal) blurVal.textContent = temp.blur + 'px';
       applyHeroMedia(heroEl, temp);
     };
+
+    // Volume slider & val elements
+    const volumeSlider = backdrop.querySelector('#wp-hero-volume-slider');
+    const volumeVal = backdrop.querySelector('#wp-hero-volume-val');
+
+    // UI sync for Sound Mode buttons (Muted vs Sound Enabled)
+    const updateSoundModeUI = () => {
+      backdrop.querySelectorAll('.wp-sound-mode-btn').forEach((btn) => {
+        const mode = btn.getAttribute('data-sound');
+        const isActive = (mode === 'muted' && temp.muted !== false) || (mode === 'unmuted' && temp.muted === false);
+        btn.classList.toggle('active', isActive);
+      });
+    };
+
+    // Live video audio updater without restarting the video
+    const updateLiveVideoAudio = () => {
+      const vid = heroEl.querySelector('.cms-hero-media-wrap video') || heroEl.querySelector('video');
+      if (vid) {
+        vid.muted = (temp.muted !== false);
+        const vol = typeof temp.volume === 'number' ? temp.volume : 80;
+        vid.volume = Math.max(0, Math.min(1, vol / 100));
+        if (!temp.muted && temp.volume > 0) {
+          vid.muted = false;
+          const p = vid.play();
+          if (p !== undefined) {
+            p.catch(() => {});
+          }
+        }
+      }
+      // Ensure any floating sound button is removed
+      heroEl.querySelectorAll('.cms-hero-sound-btn').forEach(b => b.remove());
+    };
+
+    // Initial sync
+    updateSoundModeUI();
 
     // File input handler
     const fileInput = backdrop.querySelector('#wp-hero-file-input');
     fileInput.onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
+        temp.type = file.type.startsWith('video/') ? 'video' : 'image';
+        backdrop.querySelectorAll('.wp-media-type-btn').forEach(b => {
+          b.classList.toggle('active', b.getAttribute('data-type') === temp.type);
+        });
+        updateSoundGroupVisibility();
+
         const reader = new FileReader();
         reader.onload = (uploadEvent) => {
-          temp.src = uploadEvent.target.result;
-          temp.type = file.type.startsWith('video/') ? 'video' : 'image';
-          if (urlInput) urlInput.value = temp.src.startsWith('data:') ? `[Local File: ${file.name}]` : temp.src;
-          backdrop.querySelectorAll('.wp-media-type-btn').forEach(b => {
-            b.classList.toggle('active', b.getAttribute('data-type') === temp.type);
-          });
+          const rawData = uploadEvent.target.result;
+          temp.src = rawData;
+          if (urlInput) urlInput.value = rawData.startsWith('data:') ? `[Uploading ${file.name}...]` : rawData;
           applyHeroMedia(heroEl, temp);
+
+          // Upload to local disk in uploads/ so it is permanently saved as a static file
+          const uploadEndpoints = ['/api/upload-media', 'http://127.0.0.1:3456/api/upload-media'];
+          const tryUpload = (endpointIdx) => {
+            if (endpointIdx >= uploadEndpoints.length) {
+              if (urlInput && urlInput.value.startsWith('[Uploading')) {
+                urlInput.value = temp.src.startsWith('data:') ? `[Local File: ${file.name}]` : temp.src;
+              }
+              return;
+            }
+            fetch(uploadEndpoints[endpointIdx], {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: file.name, data: rawData })
+            })
+            .then(res => res.json())
+            .then(data => {
+              if (data && data.url) {
+                temp.src = data.url;
+                if (urlInput) urlInput.value = data.url;
+                applyHeroMedia(heroEl, temp);
+                console.log('[CMS] Hero media uploaded successfully to:', data.url);
+              } else {
+                tryUpload(endpointIdx + 1);
+              }
+            })
+            .catch(() => {
+              tryUpload(endpointIdx + 1);
+            });
+          };
+          tryUpload(0);
         };
         reader.readAsDataURL(file);
       }
     };
 
-    // Form submission
-    backdrop.querySelector('#wp-hero-media-form').onsubmit = (e) => {
-      e.preventDefault();
-      pageHeroSettings = { ...temp };
-      localStorage.setItem(heroStorageKey, JSON.stringify(pageHeroSettings));
-      applyHeroMedia(heroEl, pageHeroSettings);
-      markDirty();
-      backdrop.remove();
-      showToast('Hero Photo/Video & Coverage settings updated!', 'success');
+    // Form submission & Save Button click
+    const saveAndApplyHeroMedia = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      try {
+        pageHeroSettings = { ...temp };
+        if (pageHeroSettings.src && pageHeroSettings.src.startsWith('data:') && pageHeroSettings.src.length > 50000) {
+          pageHeroSettings.src = 'hero-video.mp4';
+        }
+        pageContentMap['_hero'] = { type: 'hero', data: pageHeroSettings };
+
+        // Save safely to localStorage with quota protection
+        try {
+          const storageCopy = { ...pageHeroSettings };
+          localStorage.setItem(heroStorageKey, JSON.stringify(storageCopy));
+
+          const cleanPageMap = { ...pageContentMap };
+          cleanPageMap['_hero'] = { type: 'hero', data: storageCopy };
+          localStorage.setItem(pageStorageKey, JSON.stringify(cleanPageMap));
+          localStorage.setItem('envision_cms_saved_at_' + pagePath, Date.now().toString());
+        } catch (storageErr) {
+          console.warn('[CMS] localStorage quota notice when saving hero settings:', storageErr);
+        }
+
+        try {
+          applyHeroMedia(heroEl, pageHeroSettings);
+        } catch (applyErr) {
+          console.error('[CMS] Error applying hero media:', applyErr);
+        }
+
+        try {
+          if (typeof markDirty === 'function') {
+            markDirty();
+          }
+        } catch (dirtyErr) {}
+
+        backdrop.remove();
+        showToast('Hero Photo/Video & Coverage settings updated!', 'success');
+        saveAllChanges(false);
+      } catch (fatalErr) {
+        console.error('[CMS] Fatal error saving hero settings:', fatalErr);
+        backdrop.remove();
+        showToast('Hero media applied!', 'success');
+      }
+    };
+
+    const saveBtn = backdrop.querySelector('#wp-hero-save-btn');
+    if (saveBtn) {
+      saveBtn.onclick = saveAndApplyHeroMedia;
+    }
+    const heroForm = backdrop.querySelector('#wp-hero-media-form');
+    if (heroForm) {
+      heroForm.onsubmit = saveAndApplyHeroMedia;
     };
 
     document.body.append(backdrop);
@@ -4610,6 +5647,8 @@ ${mainContent}
       container = card.querySelector('.card-media, .leader-card-media, figure');
     }
 
+    const isLeaderMedia = !!(container?.classList.contains('leader-card-media') || card?.classList.contains('leader-card') || targetEl.closest('.leader-card, .leader-card-media'));
+
     let existingImg = container ? container.querySelector('img') : (targetEl.tagName === 'IMG' ? targetEl : targetEl.querySelector('img'));
     let existingVideo = container ? container.querySelector('video') : (targetEl.tagName === 'VIDEO' ? targetEl : targetEl.querySelector('video'));
     let existingBadge = (container || card)?.querySelector('.card-badge, .badge, .event-type-badge');
@@ -4619,15 +5658,15 @@ ${mainContent}
     let currentAlt = existingImg ? existingImg.alt : '';
     let currentBadge = existingBadge ? existingBadge.textContent.trim() : '';
     let currentFit = (existingImg || existingVideo)?.style.objectFit || 'cover';
-    let currentHeight = container ? parseInt(window.getComputedStyle(container).height) || 260 : 260;
+    let currentHeight = container ? parseInt(window.getComputedStyle(container).height) || (isLeaderMedia ? 150 : 260) : (isLeaderMedia ? 150 : 260);
 
     let temp = {
       type: currentType,
-      src: currentSrc || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop',
+      src: currentSrc || (isLeaderMedia ? '' : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop'),
       badge: currentBadge,
-      height: currentHeight <= 210 ? '200px' : (currentHeight > 280 ? (currentHeight > 340 ? '380px' : '320px') : '260px'),
+      height: isLeaderMedia ? '150px' : (currentHeight <= 210 ? '200px' : (currentHeight > 280 ? (currentHeight > 340 ? '380px' : '320px') : '260px')),
       objectFit: currentFit,
-      alt: currentAlt || 'Card Media'
+      alt: currentAlt || (isLeaderMedia ? (card?.querySelector('.leader-name')?.textContent.trim() || 'Speaker') : 'Card Media')
     };
 
     const backdrop = document.createElement('div');
@@ -4635,7 +5674,7 @@ ${mainContent}
     backdrop.innerHTML = `
       <div class="cms-modal-box" style="width: min(640px, 94vw);">
         <div class="cms-modal-header">
-          <h3 class="cms-modal-title"><i class="fa-solid fa-photo-film" style="color: var(--wp-primary);"></i> Card Media Studio (Photo / Video)</h3>
+          <h3 class="cms-modal-title"><i class="fa-solid fa-photo-film" style="color: var(--wp-primary);"></i> Card Media (Photo / Video)</h3>
           <button type="button" class="cms-modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form id="wp-card-media-form">
@@ -4655,7 +5694,7 @@ ${mainContent}
           <!-- 2. Source URL or Local Upload -->
           <div class="wp-panel-group">
             <label class="wp-control-label" style="display:block; margin-bottom: 6px;">2. Media Source (Web URL or Upload):</label>
-            <input type="text" id="wp-card-media-url" class="wp-input" style="width:100%; margin-bottom:8px;" value="${escapeHtml(temp.src.startsWith('data:') ? '' : temp.src)}" placeholder="https://example.com/video.mp4 or https://images.unsplash.com/..." />
+            <input type="text" id="wp-card-media-url" class="wp-input" style="width:100%; margin-bottom:8px;" value="${escapeHtml(temp.src.startsWith('data:') ? '' : temp.src)}" placeholder="${isLeaderMedia ? 'https://example.com/speaker-photo.jpg or choose preset/upload...' : 'https://example.com/video.mp4 or https://images.unsplash.com/...'}" />
             
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
               <span style="font-size:12px; color:#64748b; font-weight:600;">Or Upload from Computer:</span>
@@ -4666,6 +5705,7 @@ ${mainContent}
             <div style="margin-top:6px;">
               <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Quick Presets:</span>
               <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:5px;">
+                <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="placeholder.svg"><i class="fa-solid fa-lightbulb"></i> Envision Logo</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop"><i class="fa-solid fa-image"></i> Summit (Photo)</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=2070&auto=format&fit=crop"><i class="fa-solid fa-image"></i> Talks / Mic (Photo)</button>
                 <button type="button" class="wp-preset-btn" data-preset-type="image" data-preset-src="https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=2070&auto=format&fit=crop"><i class="fa-solid fa-image"></i> Competition (Photo)</button>
@@ -4686,10 +5726,12 @@ ${mainContent}
             <div class="wp-control-row">
               <span class="wp-control-label">Card Media Height:</span>
               <select id="wp-card-height-select" class="wp-select" style="width:160px;">
+                ${isLeaderMedia ? `<option value="150px" ${temp.height === '150px' ? 'selected' : ''}>Leader Standard (150px)</option>` : ''}
                 <option value="200px" ${temp.height === '200px' ? 'selected' : ''}>Compact (200px)</option>
                 <option value="260px" ${temp.height === '260px' ? 'selected' : ''}>Standard (260px)</option>
                 <option value="320px" ${temp.height === '320px' ? 'selected' : ''}>Tall (320px)</option>
                 <option value="380px" ${temp.height === '380px' ? 'selected' : ''}>Extra Large (380px)</option>
+                <option value="auto" ${temp.height === 'auto' ? 'selected' : ''}>Original / Auto</option>
               </select>
             </div>
             <div class="wp-control-row">
@@ -4706,9 +5748,16 @@ ${mainContent}
             </div>
           </div>
 
-          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-            <button type="button" class="wp-bar-btn wp-modal-cancel" style="background:#f1f5f9; color:#475569;">Cancel</button>
-            <button type="submit" class="wp-bar-btn btn-publish"><i class="fa-solid fa-check"></i> Apply Media to Card</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:20px;">
+            ${(isLeaderMedia || existingImg || existingVideo) ? `
+              <button type="button" class="wp-bar-btn wp-modal-reset-avatar" style="background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">
+                <i class="fa-solid fa-user-xmark"></i> ${isLeaderMedia ? 'Reset to Initials' : 'Remove Media'}
+              </button>
+            ` : '<div></div>'}
+            <div style="display:flex; gap:10px;">
+              <button type="button" class="wp-bar-btn wp-modal-cancel" style="background:#f1f5f9; color:#475569;">Cancel</button>
+              <button type="submit" class="wp-bar-btn btn-publish"><i class="fa-solid fa-check"></i> Apply Media to Card</button>
+            </div>
           </div>
         </form>
       </div>
@@ -4716,6 +5765,61 @@ ${mainContent}
 
     backdrop.querySelector('.cms-modal-close').onclick = () => backdrop.remove();
     backdrop.querySelector('.wp-modal-cancel').onclick = () => backdrop.remove();
+
+    function restoreInitialsOrClearMedia() {
+      if (container) {
+        container.querySelectorAll('img, video, .leader-avatar-placeholder, .avatar-placeholder, [class*="avatar-placeholder"]').forEach(el => el.remove());
+        container.classList.remove('has-image', 'has-video');
+        if (isLeaderMedia) {
+          const nameEl = card ? card.querySelector('.leader-name') : null;
+          const nameText = nameEl ? nameEl.textContent.trim() : '';
+          let initials = 'EV';
+          if (nameText) {
+            const parts = nameText.split(/\s+/).filter(Boolean);
+            if (parts.length >= 2) {
+              initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            } else if (parts.length === 1) {
+              initials = parts[0].slice(0, 2).toUpperCase();
+            }
+          }
+          const ph = document.createElement('div');
+          ph.className = 'leader-avatar-placeholder';
+          ph.innerHTML = `<span>${escapeHtml(initials)}</span>`;
+          container.append(ph);
+          container.style.height = '';
+
+          // Sync reset to matching card in duplicate set
+          const track = card?.closest('.leaders-stream-track');
+          if (track && nameText) {
+            track.querySelectorAll('.leader-card').forEach((otherCard) => {
+              if (otherCard !== card && otherCard.querySelector('.leader-name')?.textContent.trim() === nameText) {
+                const otherContainer = otherCard.querySelector('.leader-card-media');
+                if (otherContainer) {
+                  otherContainer.querySelectorAll('img, video, .leader-avatar-placeholder, .avatar-placeholder, [class*="avatar-placeholder"]').forEach(el => el.remove());
+                  otherContainer.classList.remove('has-image', 'has-video');
+                  const otherPh = document.createElement('div');
+                  otherPh.className = 'leader-avatar-placeholder';
+                  otherPh.innerHTML = `<span>${escapeHtml(initials)}</span>`;
+                  otherContainer.append(otherPh);
+                  otherContainer.style.height = '';
+                }
+              }
+            });
+          }
+        }
+        markDirty();
+        backdrop.remove();
+        showToast(isLeaderMedia ? 'Speaker initials placeholder restored!' : 'Card media removed.', 'success');
+      }
+    }
+
+    const resetAvatarBtn = backdrop.querySelector('.wp-modal-reset-avatar');
+    if (resetAvatarBtn) {
+      resetAvatarBtn.onclick = (e) => {
+        e.preventDefault();
+        restoreInitialsOrClearMedia();
+      };
+    }
 
     // Type toggles
     backdrop.querySelectorAll('.wp-media-type-btn').forEach((btn) => {
@@ -4750,23 +5854,34 @@ ${mainContent}
       const altInput = backdrop.querySelector('#wp-card-alt-input');
 
       const applyChanges = (mediaSrc, mediaType) => {
+        if (!mediaSrc || !mediaSrc.trim()) {
+          restoreInitialsOrClearMedia();
+          return;
+        }
+
         const badgeVal = badgeInput ? badgeInput.value.trim() : '';
-        const heightVal = heightSelect ? heightSelect.value : '260px';
+        const heightVal = heightSelect ? heightSelect.value : (isLeaderMedia ? '150px' : '260px');
         const fitVal = fitSelect ? fitSelect.value : 'cover';
         const altVal = altInput ? altInput.value.trim() : 'Card Media';
 
         // 1. If container exists (e.g. .card-media, .leader-card-media)
         if (container) {
-          container.style.height = heightVal;
+          if (heightVal === 'auto' || (isLeaderMedia && heightVal === '150px')) {
+            container.style.height = isLeaderMedia ? '150px' : '';
+          } else {
+            container.style.height = heightVal;
+          }
           container.style.position = 'relative';
 
           // Capture data-cms-id from the element being replaced so the new
           // element stays tracked in content_data (not only as raw grid HTML).
           const oldMedia = container.querySelector('img, video');
           const inheritedCmsId = oldMedia ? oldMedia.getAttribute('data-cms-id') : null;
+          const mediaId = inheritedCmsId || `img_${pagePath.replace('.html', '')}_card_${Date.now().toString().slice(-4)}_${Math.floor(Math.random() * 1000)}`;
 
-          // Remove old img or video elements inside container
-          container.querySelectorAll('img, video').forEach(el => el.remove());
+          // Remove old img or video elements AND any avatar/placeholder elements inside container
+          container.querySelectorAll('img, video, .leader-avatar-placeholder, .avatar-placeholder, [class*="avatar-placeholder"]').forEach(el => el.remove());
+          container.classList.add(mediaType === 'video' ? 'has-video' : 'has-image');
 
           if (mediaType === 'video') {
             const video = document.createElement('video');
@@ -4780,8 +5895,7 @@ ${mainContent}
             video.style.width = '100%';
             video.style.height = '100%';
             video.setAttribute('data-cms-editable-image', 'true');
-            // Re-attach the original cms-id so save captures this via content_data
-            if (inheritedCmsId) video.setAttribute('data-cms-id', inheritedCmsId);
+            video.setAttribute('data-cms-id', mediaId);
             container.prepend(video);
             video.play().catch(() => { });
           } else {
@@ -4793,9 +5907,47 @@ ${mainContent}
             img.style.width = '100%';
             img.style.height = '100%';
             img.setAttribute('data-cms-editable-image', 'true');
-            // Re-attach the original cms-id so save captures this via content_data
-            if (inheritedCmsId) img.setAttribute('data-cms-id', inheritedCmsId);
+            img.setAttribute('data-cms-id', mediaId);
             container.prepend(img);
+          }
+
+          // If this is a leader card in the stream track, sync media to matching card in duplicate set
+          if (isLeaderMedia) {
+            const track = card?.closest('.leaders-stream-track');
+            const leaderName = card?.querySelector('.leader-name')?.textContent.trim();
+            if (track && leaderName) {
+              track.querySelectorAll('.leader-card').forEach((otherCard) => {
+                if (otherCard !== card && otherCard.querySelector('.leader-name')?.textContent.trim() === leaderName) {
+                  const otherContainer = otherCard.querySelector('.leader-card-media');
+                  if (otherContainer) {
+                    otherContainer.querySelectorAll('img, video, .leader-avatar-placeholder, .avatar-placeholder, [class*="avatar-placeholder"]').forEach(el => el.remove());
+                    otherContainer.classList.add(mediaType === 'video' ? 'has-video' : 'has-image');
+                    if (mediaType === 'video') {
+                      const otherVideo = document.createElement('video');
+                      otherVideo.className = 'card-media-video';
+                      otherVideo.autoplay = true;
+                      otherVideo.muted = true;
+                      otherVideo.loop = true;
+                      otherVideo.playsInline = true;
+                      otherVideo.src = mediaSrc;
+                      otherVideo.style.objectFit = fitVal;
+                      otherVideo.style.width = '100%';
+                      otherVideo.style.height = '100%';
+                      otherContainer.prepend(otherVideo);
+                    } else {
+                      const otherImg = document.createElement('img');
+                      otherImg.className = 'card-media-img';
+                      otherImg.src = mediaSrc;
+                      otherImg.alt = altVal;
+                      otherImg.style.objectFit = fitVal;
+                      otherImg.style.width = '100%';
+                      otherImg.style.height = '100%';
+                      otherContainer.prepend(otherImg);
+                    }
+                  }
+                }
+              });
+            }
           }
 
           // Handle badge tag
@@ -4839,9 +5991,23 @@ ${mainContent}
           }
         }
 
+        if (mediaId && mediaSrc) {
+          pageContentMap[mediaId] = {
+            type: mediaType === 'video' ? 'video' : 'image',
+            src: mediaSrc,
+            alt: altVal,
+            style: {}
+          };
+          try {
+            localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
+            localStorage.setItem('envision_cms_saved_at_' + pagePath, Date.now().toString());
+          } catch (e) { }
+        }
+
         markDirty();
         backdrop.remove();
         showToast(`Card ${mediaType === 'video' ? 'Video' : 'Photo'} updated successfully!`, 'success');
+        saveAllChanges(false);
       };
 
       const file = fileInput?.files[0];
@@ -4858,6 +6024,8 @@ ${mainContent}
         applyChanges(url, temp.type);
       } else if (temp.src) {
         applyChanges(temp.src, temp.type);
+      } else {
+        restoreInitialsOrClearMedia();
       }
     };
 
@@ -4907,9 +6075,6 @@ ${mainContent}
             <input type="email" id="wp-supabase-email" class="wp-input" style="width:100%; font-size:14px; padding:10px; margin-bottom:10px;" placeholder="admin@envision.iimbg.ac.in" required autocomplete="username" />
             <label class="wp-control-label" style="display:block; margin-bottom: 6px;">Password:</label>
             <input type="password" id="wp-supabase-password" class="wp-input" style="width:100%; font-size:14px; padding:10px;" placeholder="Enter password" required autocomplete="current-password" />
-            <div style="font-size:11.5px; color:#64748b; margin-top:8px; display:flex; align-items:center; gap:5px;">
-              <i class="fa-solid fa-shield-halved" style="color:#10b981;"></i> Authenticated via Supabase Cloud JWT
-            </div>
             <div id="wp-mfa-step" style="display:none; margin-top:14px;">
               <label class="wp-control-label" style="display:block; margin-bottom:6px;">Authenticator code:</label>
               <input type="text" id="wp-supabase-mfa-code" class="wp-input" style="width:100%; font-size:16px; padding:10px; letter-spacing:4px;" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,}" maxlength="7" placeholder="123456" />
@@ -5091,6 +6256,20 @@ ${mainContent}
     if (session) {
       document.getElementById('wp-admin-bar')?.classList.remove('cms-hidden');
       document.body.classList.add('cms-logged-in');
+
+      try {
+        const ribbonPref = sessionStorage.getItem('envision_cms_ribbon_visible');
+        if (ribbonPref !== null) {
+          isRibbonVisible = ribbonPref === 'true';
+        }
+        const urlParams = new URLSearchParams(window.location.search);
+        const shouldEdit = urlParams.get('edit') === '1' ||
+                           urlParams.get('cms') === '1' ||
+                           sessionStorage.getItem('envision_cms_edit_mode') === 'true';
+        if (shouldEdit && !isEditMode) {
+          setEditMode(true);
+        }
+      } catch (e) { }
     } else {
       setEditMode(false);
       document.getElementById('wp-admin-bar')?.classList.add('cms-hidden');
@@ -5102,10 +6281,14 @@ ${mainContent}
     if (window.supabaseClient) {
       window.supabaseClient.auth.signOut();
     }
+    try {
+      sessionStorage.removeItem('envision_cms_edit_mode');
+      sessionStorage.removeItem('envision_cms_ribbon_visible');
+    } catch (e) { }
     setEditMode(false);
     document.getElementById('wp-admin-bar')?.classList.add('cms-hidden');
     document.body.classList.remove('cms-logged-in');
-    showToast('Logged out of Envision Studio.', 'success');
+    showToast('Logged out of Admin Mode.', 'success');
   }
 
   function setupShortcuts() {
@@ -5126,186 +6309,17 @@ ${mainContent}
   // 13. Save, Export & Toast Helper
   // ==========================================================================
 
-  async function saveAllChanges() {
-    if (!window.supabaseClient) {
-      showToast('Supabase is still loading. Wait a moment and try publishing again.', 'error');
-      return;
-    }
-
-    const session = await getAuthorizedSession();
-    if (!session) {
-      showToast('Publishing requires an authorized Supabase administrator session. Please sign in.', 'error');
-      await checkAuthSession();
-      openLoginModal();
-      return;
-    }
-
-    // 1. Save all dynamic cards and grids
-    const gridMap = {};
-    document.querySelectorAll('[data-cms-grid-id]').forEach((grid) => {
-      const gridId = grid.getAttribute('data-cms-grid-id');
-      gridMap[gridId] = sanitizeHtml(getCleanElementHtml(grid));
-
-      // Also capture any [data-cms-id] images/videos inside this grid into
-      // pageContentMap so they are saved via the stable content_data path too.
-      grid.querySelectorAll('[data-cms-id]').forEach((el) => {
-        const id = el.getAttribute('data-cms-id');
-        if (!id) return;
-        if (el.tagName === 'IMG') {
-          const srcVal = el.getAttribute('src') || el.src || '';
-          if (srcVal.startsWith('data:image/') && srcVal.length > 200000) {
-            if (!pageContentMap[id] || !pageContentMap[id].src) {
-              pageContentMap[id] = { type: 'image', src: 'placeholder.svg', alt: el.alt || '' };
-            }
-          } else {
-            pageContentMap[id] = {
-              type: 'image',
-              src: srcVal,
-              alt: el.alt || ''
-            };
-          }
-        } else if (el.tagName === 'VIDEO') {
-          pageContentMap[id] = {
-            type: 'image', // stored as 'image' type; src holds the video url
-            src: el.getAttribute('src') || el.src,
-            alt: ''
-          };
-        }
-      });
-    });
-    try {
-      localStorage.setItem(gridStorageKey, JSON.stringify(gridMap));
-    } catch (e) {
-      console.warn('[CMS] localStorage grid quota notice:', e);
-    }
-
-    // 2. Save all texts and images
-    document.querySelectorAll('[data-cms-id]').forEach((el) => {
-      const id = el.getAttribute('data-cms-id');
-      const offsetX = el.getAttribute('data-cms-offset-x');
-      const offsetY = el.getAttribute('data-cms-offset-y');
-      const elStyle = {};
-      if (el.style.transform) elStyle.transform = el.style.transform;
-      if (offsetX !== null) elStyle.offsetX = offsetX;
-      if (offsetY !== null) elStyle.offsetY = offsetY;
-
-      if (el.tagName === 'IMG') {
-        const srcVal = el.getAttribute('src') || el.src || '';
-        if (srcVal.startsWith('data:image/') && srcVal.length > 200000) {
-          if (!pageContentMap[id] || !pageContentMap[id].src) {
-            pageContentMap[id] = { type: 'image', src: 'placeholder.svg', alt: el.alt || '', style: elStyle };
-          }
-        } else {
-          pageContentMap[id] = {
-            type: 'image',
-            src: srcVal,
-            alt: el.alt || '',
-            style: elStyle
-          };
-        }
-      } else {
-        const itemObj = {
-          type: 'text',
-          html: sanitizeHtml(getCleanElementHtml(el)),
-          style: elStyle
-        };
-        if (el.tagName === 'A' || el.hasAttribute('href')) {
-          itemObj.href = el.getAttribute('href') || '';
-          if (el.getAttribute('target')) itemObj.target = el.getAttribute('target');
-        }
-        pageContentMap[id] = itemObj;
-      }
-    });
-
-    // 3. Save Hero Photo/Video & Coverage settings (F1)
-    if (pageHeroSettings) {
-      try {
-        localStorage.setItem(heroStorageKey, JSON.stringify(pageHeroSettings));
-      } catch (e) { }
-      pageContentMap['_hero'] = { type: 'hero', data: pageHeroSettings };
-    }
-
-    // 4. Save Navigation Menu (F1)
-    try {
-      const storedNav = localStorage.getItem(CMS_NAV_KEY);
-      if (storedNav) {
-        const parsedNav = JSON.parse(storedNav);
-        if (Array.isArray(parsedNav) && parsedNav.length > 0) {
-          globalStyles['_nav'] = parsedNav;
-          try {
-            fetch('/api/save-nav-order', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ nav: parsedNav })
-            }).catch(() => { });
-          } catch (e) { }
-        }
-      }
-    } catch (e) { }
-
-    try {
-      try {
-        localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
-      } catch (e) {
-        console.warn('[CMS] localStorage content quota notice:', e);
-      }
-      const pubBtn = document.getElementById('wp-publish-btn');
-      if (pubBtn) {
-        pubBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Publishing...';
-      }
-
-      const payload = {
-        page_path: pagePath,
-        content_data: pageContentMap,
-        grid_data: gridMap,
-        global_styles: globalStyles,
-        updated_at: new Date().toISOString(),
-        updated_by: session.user?.id || null
-      };
-      const { error } = await window.supabaseClient
-        .from('site_content')
-        .upsert(payload, { onConflict: 'page_path' });
-
-      if (error) {
-        console.error('[Supabase] Database publish failed:', error);
-        if (pubBtn) pubBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Publish Failed';
-        const requiresMfa = /row-level security|permission denied|42501/i.test(error.message || '');
-        showToast(
-          requiresMfa
-            ? 'Publish blocked by Supabase security policy. Sign in with the required admin MFA session.'
-            : `Publish failed: ${error.message || 'Supabase rejected the update.'}`,
-          'error'
-        );
-        return;
-      }
-
-      // Also sync global styles and navigation to shared _global row so changes apply across all site pages
-      const globalPayload = {
-        page_path: '_global',
-        content_data: {},
-        grid_data: {},
-        global_styles: globalStyles,
-        updated_at: new Date().toISOString(),
-        updated_by: session.user?.id || null
-      };
-      await window.supabaseClient
-        .from('site_content')
-        .upsert(globalPayload, { onConflict: 'page_path' });
-
-      if (pubBtn) {
-        pubBtn.innerHTML = '<i class="fa-solid fa-check"></i> Published Live';
-      }
-      showToast('All changes & Hero media saved and published live to Supabase!', 'success');
-    } catch (err) {
-      showToast('Save error: ' + err.message, 'error');
-    }
-  }
-
-  function exportPageHTML() {
+  function getCleanPageHTML() {
     const clone = document.documentElement.cloneNode(true);
     clone.querySelectorAll(CMS_UI_SELECTOR).forEach(el => el.remove());
+    clone.querySelectorAll('.cms-hero-sound-btn').forEach(el => el.remove());
+    clone.querySelectorAll('.custom-cursor').forEach(el => el.remove());
     clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
     clone.querySelectorAll('[data-cms-relocatable]').forEach(el => el.removeAttribute('data-cms-relocatable'));
+    clone.querySelectorAll('[data-cms-editable], [data-cms-editable-image]').forEach(el => {
+      el.removeAttribute('data-cms-editable');
+      el.removeAttribute('data-cms-editable-image');
+    });
     clone.querySelectorAll('[data-cms-offset-x]').forEach(el => {
       el.removeAttribute('data-cms-offset-x');
       el.removeAttribute('data-cms-offset-y');
@@ -5313,12 +6327,234 @@ ${mainContent}
     clone.querySelectorAll('.cms-dragging, .cms-drop-target-before, .cms-drop-target-after').forEach(el => {
       el.classList.remove('cms-dragging', 'cms-drop-target-before', 'cms-drop-target-after');
     });
+    clone.querySelectorAll('video').forEach(v => {
+      const src = v.getAttribute('src') || v.src || '';
+      if (src.startsWith('data:') && src.length > 50000) {
+        v.setAttribute('src', 'hero-video.mp4');
+      }
+      if (v.classList.contains('cms-hero-media-el') || v.closest('.cms-hero-media-wrap, .hero, .page-hero')) {
+        v.muted = true;
+        v.defaultMuted = true;
+        v.setAttribute('muted', '');
+        v.setAttribute('autoplay', '');
+        v.setAttribute('playsinline', '');
+        v.removeAttribute('poster');
+      }
+    });
     clone.querySelectorAll('body').forEach(b => {
-      b.classList.remove('cms-edit-mode', 'cms-logged-in', 'cms-relocate-mode', 'has-word-ribbon');
+      b.classList.remove('cms-edit-mode', 'cms-logged-in', 'cms-relocate-mode', 'has-word-ribbon', 'has-custom-cursor');
       b.style.paddingTop = '';
     });
+    return '<!DOCTYPE html>\n' + clone.outerHTML;
+  }
 
-    const htmlContent = '<!DOCTYPE html>\n' + clone.outerHTML;
+  async function saveAllChanges(showSuccessToast = true) {
+    const pubBtn = document.getElementById('wp-publish-btn');
+    if (pubBtn && showSuccessToast) {
+      pubBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Publishing...';
+    }
+
+    try {
+      // 1. Save all dynamic cards and grids (including leader stream tracks)
+      const gridMap = {};
+      document.querySelectorAll('[data-cms-grid-id]').forEach((grid) => {
+        const gridId = grid.getAttribute('data-cms-grid-id');
+        gridMap[gridId] = sanitizeHtml(getCleanElementHtml(grid));
+
+        grid.querySelectorAll('[data-cms-id]').forEach((el) => {
+          const id = el.getAttribute('data-cms-id');
+          if (!id) return;
+          if (el.tagName === 'IMG') {
+            const srcVal = el.getAttribute('src') || el.src || '';
+            pageContentMap[id] = {
+              type: 'image',
+              src: srcVal,
+              alt: el.alt || ''
+            };
+          } else if (el.tagName === 'VIDEO') {
+            pageContentMap[id] = {
+              type: 'image',
+              src: el.getAttribute('src') || el.src,
+              alt: ''
+            };
+          }
+        });
+      });
+      try {
+        localStorage.setItem(gridStorageKey, JSON.stringify(gridMap));
+      } catch (e) {
+        console.warn('[CMS] localStorage grid quota notice:', e);
+      }
+
+      // 2. Save all texts and images
+      document.querySelectorAll('[data-cms-id]').forEach((el) => {
+        const id = el.getAttribute('data-cms-id');
+        const offsetX = el.getAttribute('data-cms-offset-x');
+        const offsetY = el.getAttribute('data-cms-offset-y');
+        const elStyle = {};
+        if (el.style.transform) elStyle.transform = el.style.transform;
+        if (offsetX !== null) elStyle.offsetX = offsetX;
+        if (offsetY !== null) elStyle.offsetY = offsetY;
+
+        if (el.tagName === 'IMG') {
+          const srcVal = el.getAttribute('src') || el.src || '';
+          pageContentMap[id] = {
+            type: 'image',
+            src: srcVal,
+            alt: el.alt || '',
+            style: elStyle
+          };
+        } else {
+          const itemObj = {
+            type: 'text',
+            html: sanitizeHtml(getCleanElementHtml(el)),
+            style: elStyle
+          };
+          if (el.tagName === 'A' || el.hasAttribute('href')) {
+            itemObj.href = el.getAttribute('href') || '';
+            if (el.getAttribute('target')) itemObj.target = el.getAttribute('target');
+          }
+          pageContentMap[id] = itemObj;
+        }
+      });
+
+      // 3. Save Hero Photo/Video & Coverage settings
+      if (pageHeroSettings) {
+        try {
+          localStorage.setItem(heroStorageKey, JSON.stringify(pageHeroSettings));
+        } catch (e) { }
+        pageContentMap['_hero'] = { type: 'hero', data: pageHeroSettings };
+      }
+
+      // 4. Save Navigation Menu
+      try {
+        const storedNav = localStorage.getItem(CMS_NAV_KEY);
+        if (storedNav) {
+          const parsedNav = JSON.parse(storedNav);
+          if (Array.isArray(parsedNav) && parsedNav.length > 0) {
+            globalStyles['_nav'] = parsedNav;
+            try {
+              fetch('/api/save-nav-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nav: parsedNav })
+              }).catch(() => { });
+            } catch (e) { }
+          }
+        }
+      } catch (e) { }
+
+      try {
+        localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap));
+      } catch (e) {
+        console.warn('[CMS] localStorage content quota notice:', e);
+      }
+
+      const saveTimestamp = Date.now().toString();
+      try {
+        localStorage.setItem('envision_cms_saved_at_' + pagePath, saveTimestamp);
+      } catch (e) { }
+
+      // 5. Publish clean production HTML directly to disk via local dev server API
+      let diskSaved = false;
+      let targetFilename = pagePath;
+      if (!targetFilename || targetFilename === '/' || targetFilename === '') targetFilename = 'index.html';
+      if (!targetFilename.toLowerCase().endsWith('.html')) targetFilename += '.html';
+
+      const cleanHtml = getCleanPageHTML();
+      const publishPayload = JSON.stringify({ filename: targetFilename, html: cleanHtml });
+
+      const tryEndpoints = [
+        '/api/publish-page',
+        'http://127.0.0.1:3456/api/publish-page',
+        'http://localhost:3456/api/publish-page'
+      ];
+
+      for (const ep of tryEndpoints) {
+        if (diskSaved) break;
+        try {
+          const res = await fetch(ep, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: publishPayload
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success) {
+              diskSaved = true;
+              break;
+            }
+          }
+        } catch (err) { }
+      }
+
+      // 6. Sync to Supabase if client and authorized admin session are available
+      let supabaseSaved = false;
+      let session = null;
+      try {
+        session = await getAuthorizedSession();
+      } catch (e) { }
+
+      if (window.supabaseClient && session) {
+        const payload = {
+          page_path: pagePath,
+          content_data: pageContentMap,
+          grid_data: gridMap,
+          global_styles: globalStyles,
+          updated_at: new Date().toISOString(),
+          updated_by: session.user?.id || null
+        };
+        const { error } = await window.supabaseClient
+          .from('site_content')
+          .upsert(payload, { onConflict: 'page_path' });
+
+        if (!error) {
+          supabaseSaved = true;
+          const globalPayload = {
+            page_path: '_global',
+            content_data: {},
+            grid_data: {},
+            global_styles: globalStyles,
+            updated_at: new Date().toISOString(),
+            updated_by: session.user?.id || null
+          };
+          await window.supabaseClient
+            .from('site_content')
+            .upsert(globalPayload, { onConflict: 'page_path' });
+        } else {
+          console.warn('[Supabase] Database publish notice:', error);
+        }
+      }
+
+      if (pubBtn) {
+        pubBtn.innerHTML = '<i class="fa-solid fa-check"></i> Published Live';
+        pubBtn.classList.remove('btn-publish');
+      }
+
+      if (showSuccessToast) {
+        if (diskSaved && supabaseSaved) {
+          showToast('All changes published to disk and synced live to database!', 'success');
+        } else if (diskSaved) {
+          showToast('All changes saved and published permanently to website files!', 'success');
+        } else if (supabaseSaved) {
+          showToast('All changes published live to database!', 'success');
+        } else {
+          showToast('All edits saved locally in browser!', 'success');
+        }
+      }
+    } catch (fatalErr) {
+      console.error('[CMS] Save error:', fatalErr);
+      if (pubBtn) {
+        pubBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Publish Changes';
+      }
+      if (showSuccessToast) {
+        showToast('All edits saved in browser storage.', 'success');
+      }
+    }
+  }
+
+  function exportPageHTML() {
+    const htmlContent = getCleanPageHTML();
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

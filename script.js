@@ -57,6 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const cursorEnabled = window.matchMedia('(pointer: fine) and (prefers-reduced-motion: no-preference)').matches;
 
   if (cursorEnabled) {
+    // Clear any existing or duplicate custom cursor elements
+    document.querySelectorAll('.custom-cursor').forEach(el => el.remove());
+
     const cursorShadow = document.createElement('div');
     const cursorRing = document.createElement('div');
     const cursorDot = document.createElement('div');
@@ -398,32 +401,323 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { threshold: 0.1 });
     signatureClips.forEach(function (video) { signatureObserver.observe(video); });
 
-    // Leader card filter — re-collect cards in case cards were added/replaced
-    var leaderFilterButtons = document.querySelectorAll('.leader-filter-btn');
-    var leaderCards = document.querySelectorAll('.leader-card');
-    leaderFilterButtons.forEach(function (button) {
-      // Remove any previously attached listener to avoid duplicates
-      var handler = function () {
-        leaderFilterButtons.forEach(function (btn) { btn.classList.remove('active'); });
-        button.classList.add('active');
-        var filter = button.dataset.filter;
-        leaderCards.forEach(function (card) {
-          if (filter === 'all') {
-            card.classList.remove('filter-hidden');
-          } else {
-            var categories = card.dataset.category || '';
-            if (categories.includes(filter)) card.classList.remove('filter-hidden');
-            else card.classList.add('filter-hidden');
-          }
-        });
-      };
-      // Use a cloned node swap to clear old listeners before re-attaching
-      var fresh = button.cloneNode(true);
-      button.parentNode.replaceChild(fresh, button);
-      fresh.addEventListener('click', handler);
-    });
 
     initRotatingWords(root);
+    initInteractiveLeaderStreams(root);
+  }
+
+  // ==========================================================================
+  // Interactive Infinite Leader Streams (Phone Swipe / Drag & Auto-Resume)
+  // Allows users on mobile/touch (and desktop) to slide the pallets back and forth.
+  // When untouched, the continuous moving animation smoothly resumes in place.
+  // ==========================================================================
+  function initInteractiveLeaderStreams(root) {
+    var streamRows = (root || document).querySelectorAll('.leaders-stream-row');
+    if (!streamRows || streamRows.length === 0) return;
+
+    streamRows.forEach(function (row) {
+      if (row._streamController) {
+        row._streamController.refresh();
+        return;
+      }
+
+      var track = row.querySelector('.leaders-stream-track');
+      if (!track) return;
+
+      var isReverse = row.classList.contains('leaders-stream-row-reverse');
+      // Forward row moves left (-1), Reverse row moves right (+1)
+      var baseDirection = isReverse ? 1 : -1;
+
+      var halfWidth = 0;
+      var currentX = 0;
+      var targetSpeed = 0; // px / sec
+      var currentSpeed = 0;
+      var baseSpeed = 0;
+
+      var isPointerDown = false;
+      var isDragging = false;
+      var isAxisLocked = false;
+      var isVerticalScroll = false;
+      var hasDragged = false;
+      var startX = 0;
+      var startY = 0;
+      var lastPointerX = 0;
+      var lastPointerTime = 0;
+      var velocity = 0; // px / ms
+      var isMomentum = false;
+      var isHovered = false;
+      var isVisible = true;
+      var resumeTimeout = null;
+
+      function measure() {
+        var cards = track.querySelectorAll('.leader-card');
+        if (cards.length >= 2) {
+          var halfIndex = Math.floor(cards.length / 2);
+          var dist = cards[halfIndex].offsetLeft - cards[0].offsetLeft;
+          if (dist > 50) {
+            halfWidth = dist;
+          }
+        }
+        if (!halfWidth || halfWidth <= 50) {
+          halfWidth = track.scrollWidth / 2 || 2200;
+        }
+
+        // 48s for forward row, 52s for reverse row
+        var duration = isReverse ? 52 : 48;
+        baseSpeed = baseDirection * (halfWidth / duration);
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          baseSpeed = 0;
+        }
+        if (!isPointerDown && !isMomentum && !resumeTimeout && !isHovered) {
+          targetSpeed = baseSpeed;
+        }
+      }
+
+      measure();
+
+      // Normalize position strictly within [-halfWidth, 0) for seamless wrap
+      function normalize(x) {
+        if (!halfWidth || halfWidth <= 0) return x;
+        x = x % halfWidth;
+        if (x > 0) x -= halfWidth;
+        return x;
+      }
+
+      // Initial offset for reverse row: offset by halfWidth * 0.5 for aesthetic variety
+      if (isReverse) {
+        currentX = -halfWidth * 0.5;
+      }
+      currentX = normalize(currentX);
+      currentSpeed = baseSpeed;
+      targetSpeed = baseSpeed;
+
+      // Mark row as interactive so CSS keyframe animation is turned off cleanly
+      row.classList.add('is-interactive');
+
+      // Schedule untouched auto-resume
+      function scheduleResume(delay) {
+        if (resumeTimeout) clearTimeout(resumeTimeout);
+        resumeTimeout = setTimeout(function () {
+          resumeTimeout = null;
+          if (!isPointerDown && !isHovered) {
+            targetSpeed = baseSpeed;
+          }
+        }, typeof delay === 'number' ? delay : 750);
+      }
+
+      // Pointer Event Handlers (touch, pen, mouse)
+      function onPointerDown(e) {
+        if (e.isPrimary === false) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+        isPointerDown = true;
+        isDragging = false;
+        hasDragged = false;
+        isAxisLocked = false;
+        isVerticalScroll = false;
+        isMomentum = false;
+
+        if (resumeTimeout) {
+          clearTimeout(resumeTimeout);
+          resumeTimeout = null;
+        }
+
+        startX = e.clientX;
+        startY = e.clientY;
+        lastPointerX = e.clientX;
+        lastPointerTime = performance.now();
+        velocity = 0;
+        currentSpeed = 0;
+        targetSpeed = 0;
+      }
+
+      function onPointerMove(e) {
+        if (!isPointerDown) return;
+
+        var clientX = e.clientX;
+        var clientY = e.clientY;
+        var diffX = clientX - startX;
+        var diffY = clientY - startY;
+
+        // Direction / axis locking (preserves smooth native vertical page scroll)
+        if (!isAxisLocked) {
+          var absX = Math.abs(diffX);
+          var absY = Math.abs(diffY);
+          if (absX > 6 || absY > 6) {
+            isAxisLocked = true;
+            if (absY > absX) {
+              // User is scrolling vertically: release drag, do not hijack
+              isVerticalScroll = true;
+              isPointerDown = false;
+              scheduleResume(400);
+              return;
+            } else {
+              // User is sliding the pallet horizontally
+              isVerticalScroll = false;
+              isDragging = true;
+              hasDragged = true;
+              row.classList.add('is-dragging');
+              try {
+                if (e.pointerId !== undefined && e.target.setPointerCapture) {
+                  e.target.setPointerCapture(e.pointerId);
+                }
+              } catch (_) {}
+            }
+          } else {
+            return; // within initial deadband
+          }
+        }
+
+        if (isVerticalScroll) return;
+
+        if (isDragging) {
+          if (e.cancelable) e.preventDefault();
+
+          var now = performance.now();
+          var dt = now - lastPointerTime;
+          var deltaX = clientX - lastPointerX;
+
+          if (dt > 0) {
+            var instV = deltaX / dt;
+            velocity = 0.65 * velocity + 0.35 * instV;
+          }
+
+          lastPointerX = clientX;
+          lastPointerTime = now;
+
+          // 1:1 direct pallet dragging
+          currentX += deltaX;
+          currentX = normalize(currentX);
+          track.style.transform = 'translate3d(' + currentX.toFixed(2) + 'px, 0, 0)';
+        }
+      }
+
+      function onPointerUp(e) {
+        if (!isPointerDown && !isDragging) return;
+
+        isPointerDown = false;
+        try {
+          if (e.pointerId !== undefined && e.target.releasePointerCapture) {
+            e.target.releasePointerCapture(e.pointerId);
+          }
+        } catch (_) {}
+
+        if (isDragging) {
+          row.classList.remove('is-dragging');
+          isDragging = false;
+
+          // Momentum coast if flicked
+          if (Math.abs(velocity) > 0.12) {
+            var maxV = 2.4;
+            velocity = Math.sign(velocity) * Math.min(Math.abs(velocity), maxV);
+            isMomentum = true;
+          } else {
+            // Untouched -> resume auto-moving animation after brief pause
+            scheduleResume(750);
+          }
+        } else {
+          scheduleResume(400);
+        }
+
+        isAxisLocked = false;
+        isVerticalScroll = false;
+      }
+
+      function onPointerCancel(e) {
+        onPointerUp(e);
+      }
+
+      row.addEventListener('pointerdown', onPointerDown, { passive: true });
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp, { passive: true });
+      window.addEventListener('pointercancel', onPointerCancel, { passive: true });
+
+      // Desktop hover pause
+      row.addEventListener('mouseenter', function (e) {
+        if (e.pointerType === 'touch') return;
+        isHovered = true;
+        targetSpeed = 0;
+      });
+
+      row.addEventListener('mouseleave', function (e) {
+        if (e.pointerType === 'touch') return;
+        isHovered = false;
+        if (!isPointerDown && !isMomentum) {
+          scheduleResume(200);
+        }
+      });
+
+      // Prevent accidental clicks after dragging pallets
+      row.addEventListener('click', function (e) {
+        if (hasDragged) {
+          e.preventDefault();
+          e.stopPropagation();
+          setTimeout(function () { hasDragged = false; }, 60);
+        }
+      }, true);
+
+      // Intersection Observer: pause when row is outside viewport (saves phone CPU & battery)
+      if (window.IntersectionObserver) {
+        var rowObserver = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            isVisible = entry.isIntersecting;
+          });
+        }, { threshold: 0.05 });
+        rowObserver.observe(row);
+      }
+
+      // Continuous Animation Loop (rAF)
+      var lastFrameTime = performance.now();
+      function tick(now) {
+        var dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+        lastFrameTime = now;
+
+        if (isVisible && !document.hidden) {
+          if (isMomentum) {
+            // Momentum decay
+            velocity *= Math.pow(0.92, dt * 60);
+            currentX += (velocity * 1000) * dt;
+            currentX = normalize(currentX);
+            track.style.transform = 'translate3d(' + currentX.toFixed(2) + 'px, 0, 0)';
+
+            if (Math.abs(velocity) < 0.02) {
+              isMomentum = false;
+              scheduleResume(700);
+            }
+          } else if (!isPointerDown && !isDragging) {
+            // Smoothly ease speed back to target
+            if (currentSpeed !== targetSpeed) {
+              var step = (targetSpeed - currentSpeed) * Math.min(1, dt * 3.5);
+              if (Math.abs(targetSpeed - currentSpeed) < 0.5) {
+                currentSpeed = targetSpeed;
+              } else {
+                currentSpeed += step;
+              }
+            }
+
+            if (Math.abs(currentSpeed) > 0.001) {
+              currentX += currentSpeed * dt;
+              currentX = normalize(currentX);
+              track.style.transform = 'translate3d(' + currentX.toFixed(2) + 'px, 0, 0)';
+            }
+          }
+        }
+
+        requestAnimationFrame(tick);
+      }
+
+      requestAnimationFrame(tick);
+
+      var controller = {
+        refresh: function () {
+          measure();
+          currentX = normalize(currentX);
+          track.style.transform = 'translate3d(' + currentX.toFixed(2) + 'px, 0, 0)';
+        }
+      };
+
+      row._streamController = controller;
+    });
   }
 
   initDynamicObservers(document);
@@ -437,6 +731,15 @@ document.addEventListener('DOMContentLoaded', () => {
       initDynamicObservers(gridEl);
     }
     initRotatingWords(document);
+    initInteractiveLeaderStreams(document);
+  });
+
+  // Re-measure on window resize / orientation change
+  window.addEventListener('resize', function () {
+    var streamRows = document.querySelectorAll('.leaders-stream-row');
+    streamRows.forEach(function (row) {
+      if (row._streamController) row._streamController.refresh();
+    });
   });
 
 
@@ -753,6 +1056,31 @@ function initMediaPlaceholders() {
   }
 
   function setupVideo(video) {
+    if (video.classList.contains('cms-hero-media-el') || video.closest('.cms-hero-media-wrap, .hero, .page-hero')) {
+      // Hero background video: must autoplay, loop, muted, with no placeholder poster
+      const currentSrc = video.getAttribute('src') || video.src || '';
+      if (currentSrc.startsWith('data:') && currentSrc.length > 50000) {
+        video.src = 'hero-video.mp4';
+      }
+      video.muted = true;
+      video.defaultMuted = true;
+      video.setAttribute('muted', '');
+      video.setAttribute('playsinline', '');
+      video.setAttribute('autoplay', '');
+      video.removeAttribute('poster');
+      video.classList.remove('media-loading');
+      video.classList.add('media-loaded');
+      var p = video.play();
+      if (p !== undefined) {
+        p.catch(function () {
+          video.muted = true;
+          video.setAttribute('muted', '');
+          video.play().catch(function () {});
+        });
+      }
+      return;
+    }
+
     if (!video.getAttribute('poster')) {
       video.setAttribute('poster', PLACEHOLDER_URL);
     }
@@ -868,8 +1196,8 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
     if (typeof value !== 'string') return false;
     var v = value.trim().replace(/[\u0000-\u0020]+/g, '');
     if (!v) return false;
-    if (/^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(v)) return true;
-    if (/^https:\/\//i.test(v)) return true;
+    if (/^data:(?:image\/(?:png|jpe?g|gif|webp)|video\/(?:mp4|webm|ogg));base64,/i.test(v)) return true;
+    if (/^https?:\/\//i.test(v)) return true;
     if (window.location.origin !== 'null' && v.indexOf(window.location.origin + '/') === 0) return true;
     if (/^\/\//.test(v)) return false;
     return !/^[a-z][a-z0-9+.-]*:/i.test(v);
@@ -907,7 +1235,8 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
     '.cms-drag-tooltip',
     '.cms-drop-placeholder',
     '.cms-move-btn',
-    '.cms-move-menu-toggle'
+    '.cms-move-menu-toggle',
+    '.cms-hero-sound-btn'
   ].join(', ');
 
   function sanitizeHtml(html) {
@@ -1160,22 +1489,67 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
           wrap.innerHTML = '';
           heroSec.style.position = 'relative';
           heroSec.style.overflow = 'hidden';
+          heroSec.classList.add('has-cms-media');
           var pos = heroSettings.position || 'full';
           wrap.className = 'cms-hero-media-wrap pos-' + pos;
           wrap.style.width = pos === 'full' ? '100%' : ((heroSettings.width || 100) + '%');
           wrap.style.height = (heroSettings.height !== undefined ? heroSettings.height : '100%');
           wrap.style.opacity = (heroSettings.opacity !== undefined ? heroSettings.opacity : 0.35).toString();
-          wrap.style.filter = (heroSettings.blur ? 'blur(' + heroSettings.blur + 'px)' : 'none');
+
+          var blurPx = heroSettings.blur !== undefined ? Number(heroSettings.blur) : 0;
+          if (blurPx > 0) {
+            wrap.style.filter = 'blur(' + blurPx + 'px)';
+            wrap.style.webkitFilter = 'blur(' + blurPx + 'px)';
+          } else {
+            wrap.style.filter = 'none';
+            wrap.style.webkitFilter = 'none';
+            wrap.style.removeProperty('filter');
+            wrap.style.removeProperty('-webkit-filter');
+          }
+
           var fit = heroSettings.objectFit || 'cover';
           if (heroSettings.type === 'video') {
             var vid = document.createElement('video');
             vid.className = 'cms-hero-media-el';
-            vid.autoplay = true; vid.muted = true; vid.loop = true; vid.playsInline = true;
+            vid.autoplay = true;
+            vid.muted = (heroSettings.muted !== false);
+            vid.defaultMuted = (heroSettings.muted !== false);
+            if (heroSettings.muted !== false) {
+              vid.setAttribute('muted', '');
+            } else {
+              vid.removeAttribute('muted');
+            }
+            var volVal = typeof heroSettings.volume === 'number' ? heroSettings.volume : 80;
+            vid.volume = Math.max(0, Math.min(1, volVal / 100));
+            vid.loop = true;
+            vid.playsInline = true;
+            vid.setAttribute('playsinline', '');
+            vid.setAttribute('autoplay', '');
+            vid.setAttribute('aria-hidden', 'true');
+            vid.removeAttribute('poster');
             vid.style.objectFit = fit;
             vid.src = heroSettings.src;
             wrap.append(vid);
-            vid.play().catch(function () { });
+            var playP = vid.play();
+            if (playP !== undefined) {
+              playP.catch(function () {
+                if (!vid.muted) {
+                  vid.muted = true;
+                  vid.setAttribute('muted', '');
+                  vid.play().catch(function () { });
+                }
+              });
+            }
+
+            // Ensure no floating sound button is rendered
+            var oldSoundBtn = heroSec.querySelector('.cms-hero-sound-btn');
+            if (oldSoundBtn) oldSoundBtn.remove();
+            heroSec.querySelectorAll('.cms-hero-sound-btn').forEach(function (b) { b.remove(); });
           } else {
+            var oldSoundBtn = heroSec.querySelector('.cms-hero-sound-btn');
+            if (oldSoundBtn) oldSoundBtn.remove();
+            heroSec.querySelectorAll('.cms-hero-sound-btn').forEach(function (b) { b.remove(); });
+
             var img = document.createElement('img');
             img.className = 'cms-hero-media-el';
             img.style.objectFit = fit;
@@ -1190,8 +1564,15 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
           }
           var overlayType = heroSettings.overlay || 'vignette';
           overlay.className = 'cms-hero-overlay overlay-' + overlayType;
+          if (overlayType === 'none') {
+            overlay.style.display = 'none';
+          } else {
+            overlay.style.display = '';
+          }
         }
       }
+
+      removeHeroAudioButtons();
     }
 
     // 3. Global colours & Navigation menu (F1, F2)
@@ -1299,24 +1680,52 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
     if (typeof initNavSlider === 'function') initNavSlider();
   }
 
-  // Instant local theme & navigation bootstrap
+  function removeHeroAudioButtons() {
+    document.querySelectorAll('.cms-hero-sound-btn').forEach(function (b) {
+      try { b.remove(); } catch (e) { }
+    });
+  }
+
+  // Instant local theme, navigation, page content & grids bootstrap
   try {
     var earlyStyles = localStorage.getItem('envision_cms_global_styles');
-    if (earlyStyles) applyGlobalStyles(JSON.parse(earlyStyles));
+    if (earlyStyles) {
+      try { applyGlobalStyles(JSON.parse(earlyStyles)); } catch (e) { }
+    }
     var earlyNav = localStorage.getItem('envision_cms_global_nav');
     var earlyNavItems = [];
     try { if (earlyNav) earlyNavItems = JSON.parse(earlyNav); } catch (e) { }
     var mergedEarly = reconcileNavItems(earlyNavItems);
     renderNavItems(mergedEarly);
+
+    var storedContent = localStorage.getItem('envision_cms_content_' + pagePath);
+    var storedGrids = localStorage.getItem('envision_cms_grids_' + pagePath);
+    var storedHero = localStorage.getItem('envision_cms_hero_' + pagePath);
+    if (storedContent || storedGrids || storedHero) {
+      var localRow = {
+        page_path: pagePath,
+        content_data: storedContent ? JSON.parse(storedContent) : {},
+        grid_data: storedGrids ? JSON.parse(storedGrids) : {},
+        global_styles: earlyStyles ? JSON.parse(earlyStyles) : {}
+      };
+      if (storedHero) {
+        try {
+          localRow.content_data._hero = { type: 'hero', data: JSON.parse(storedHero) };
+        } catch (e) { }
+      }
+      apply(localRow);
+    }
+    removeHeroAudioButtons();
   } catch (e) { }
 
   function load() {
+    removeHeroAudioButtons();
     // S15: Skip Supabase request on 404 / 403 / 500 or error pages
     if (document.querySelector('.error-hero, [data-error-page]')) return;
     if (typeof fetch !== 'function') return;
     var controller = typeof AbortController === 'function' ? new AbortController() : null;
     var timer = controller ? setTimeout(function () { controller.abort(); }, 6000) : null;
-    var url = SUPABASE_URL + '/rest/v1/site_content?select=page_path,content_data,grid_data,global_styles&page_path=in.(' + encodeURIComponent(pagePath) + ',_global)';
+    var url = SUPABASE_URL + '/rest/v1/site_content?select=page_path,content_data,grid_data,global_styles,updated_at&page_path=in.(' + encodeURIComponent(pagePath) + ',_global)';
     fetch(url, {
       headers: { apikey: PUBLISHABLE_KEY, Authorization: 'Bearer ' + PUBLISHABLE_KEY, Accept: 'application/json' },
       signal: controller ? controller.signal : undefined
@@ -1327,11 +1736,24 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
           var globalRow = rows.find(function (r) { return r.page_path === '_global'; });
           var pageRow = rows.find(function (r) { return r.page_path === pagePath; });
           if (globalRow) apply(globalRow);
-          if (pageRow) apply(pageRow);
+          if (pageRow) {
+            var localSavedAt = 0;
+            try {
+              var ts = localStorage.getItem('envision_cms_saved_at_' + pagePath);
+              if (ts) localSavedAt = parseInt(ts, 10) || 0;
+            } catch (e) { }
+            var remoteSavedAt = pageRow.updated_at ? new Date(pageRow.updated_at).getTime() : 0;
+            var hasLocalEdits = Boolean(storedContent || storedGrids || storedHero);
+            // If local edits exist, do NOT let stale remote database rows overwrite local work
+            if (!hasLocalEdits || (localSavedAt && remoteSavedAt > localSavedAt)) {
+              apply(pageRow);
+            }
+          }
         }
+        removeHeroAudioButtons();
       })
-      .catch(function () { /* keep the built-in page content */ })
-      .then(function () { if (timer) clearTimeout(timer); });
+      .catch(function () { /* keep the built-in or locally loaded page content */ })
+      .then(function () { if (timer) clearTimeout(timer); removeHeroAudioButtons(); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load);

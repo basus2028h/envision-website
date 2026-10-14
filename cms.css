@@ -62,19 +62,7 @@ body.cms-logged-in {
 }
 
 .wp-bar-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  color: #fff;
-  padding-right: 14px;
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
-  font-size: 13.5px;
-}
-
-.wp-bar-brand i {
-  color: var(--wp-accent);
-  font-size: 15px;
+  display: none !important;
 }
 
 .wp-bar-btn {
@@ -176,9 +164,56 @@ body.cms-logged-in {
   color: #fff;
 }
 
+/* ==========================================================================
+   Topbar / Header Positioning When Admin Bar & Word Ribbon Are Open
+   ========================================================================== */
+body.cms-logged-in {
+  padding-top: 44px !important;
+}
+
+body.cms-logged-in .topbar,
+body.cms-logged-in header.topbar,
+body.cms-logged-in .topbar-inspire {
+  top: 44px !important;
+  transition: top 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
 body.has-word-ribbon {
   padding-top: 136px !important;
 }
+
+body.has-word-ribbon .topbar,
+body.has-word-ribbon header.topbar,
+body.has-word-ribbon .topbar-inspire {
+  top: 136px !important;
+  transition: top 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Push hero sections and main content down so they are never covered by the shifted navbar */
+body.has-word-ribbon main,
+body.has-word-ribbon .hero,
+body.has-word-ribbon .page-hero,
+body.has-word-ribbon .error-hero,
+body.has-word-ribbon section.hero,
+body.has-word-ribbon main > section:first-of-type,
+body.has-word-ribbon main > div:first-of-type {
+  padding-top: 10rem !important;
+}
+
+body.has-word-ribbon .hero-content {
+  padding-top: 8rem !important;
+}
+
+body.cms-logged-in:not(.has-word-ribbon) main,
+body.cms-logged-in:not(.has-word-ribbon) .hero,
+body.cms-logged-in:not(.has-word-ribbon) .page-hero,
+body.cms-logged-in:not(.has-word-ribbon) .error-hero,
+body.cms-logged-in:not(.has-word-ribbon) section.hero,
+body.cms-logged-in:not(.has-word-ribbon) main > section:first-of-type,
+body.cms-logged-in:not(.has-word-ribbon) main > div:first-of-type {
+  padding-top: 6rem !important;
+}
+
 
 /* --- Microsoft Word Fluent Ribbon (Attached below Admin Bar) --- */
 #wp-word-ribbon {
@@ -862,6 +897,22 @@ body.cms-edit-mode [data-cms-card] .wp-card-toolbar {
   display: flex;
 }
 
+.leader-card-media:has(img) .leader-avatar-placeholder,
+.leader-card-media:has(video) .leader-avatar-placeholder,
+.leader-card-media.has-image .leader-avatar-placeholder,
+.leader-card-media.has-video .leader-avatar-placeholder {
+  display: none !important;
+}
+
+.leader-card-media img,
+.leader-card-media video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .wp-card-btn {
   width: 26px;
   height: 26px;
@@ -992,6 +1043,12 @@ body.cms-edit-mode .mobile-connect {
 body.cms-edit-mode a *,
 body.cms-edit-mode button:not(.wp-bar-btn):not(.wp-card-btn):not(.wp-section-btn):not(.wp-add-section-btn):not(.wp-nav-add-btn):not(.cms-modal-close):not(.wp-sidebar-tab):not(.wp-sidebar-close):not(.cms-ignore) * {
   cursor: text !important;
+}
+
+.cms-hero-sound-btn {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 body.cms-edit-mode [data-cms-editable-image] {
@@ -1206,6 +1263,13 @@ body.cms-logged-in textarea {
    Hero Media, Video Backgrounds & Page Area Coverage
    ========================================================================== */
 
+.hero:has(.cms-hero-media-wrap)::after,
+.hero.has-cms-media::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+}
+
 .cms-hero-media-wrap {
   position: absolute;
   top: 0;
@@ -1213,7 +1277,7 @@ body.cms-logged-in textarea {
   z-index: 1;
   pointer-events: none;
   overflow: hidden;
-  transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
+  transition: width 0.2s ease, height 0.2s ease, opacity 0.15s ease;
 }
 
 .cms-hero-media-wrap.pos-full {
@@ -1241,11 +1305,15 @@ body.cms-logged-in textarea {
   height: calc(100% - 20px) !important;
 }
 
-.cms-hero-media-el {
+.cms-hero-media-el,
+.cms-hero-media-wrap video,
+.cms-hero-media-wrap img {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
+  opacity: 1 !important;
+  filter: none !important;
 }
 
 /* Contrast Overlays & Gradients */
@@ -1258,24 +1326,25 @@ body.cms-logged-in textarea {
 }
 
 .cms-hero-overlay.overlay-vignette {
-  background: linear-gradient(180deg, rgba(248, 246, 240, 0.4) 0%, rgba(248, 246, 240, 0.85) 100%);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.15) 0%, rgba(15, 23, 42, 0.45) 100%);
 }
 
 [data-theme="dark"] .cms-hero-overlay.overlay-vignette,
 .dark .cms-hero-overlay.overlay-vignette {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.4) 0%, rgba(15, 23, 42, 0.88) 100%);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.8) 100%);
 }
 
 .cms-hero-overlay.overlay-navy {
-  background: linear-gradient(135deg, rgba(13, 27, 42, 0.78) 0%, rgba(27, 38, 59, 0.52) 100%);
+  background: linear-gradient(135deg, rgba(13, 27, 42, 0.72) 0%, rgba(27, 38, 59, 0.45) 100%);
 }
 
 .cms-hero-overlay.overlay-gold {
-  background: linear-gradient(135deg, rgba(184, 134, 11, 0.6) 0%, rgba(248, 246, 240, 0.82) 100%);
+  background: linear-gradient(135deg, rgba(184, 134, 11, 0.45) 0%, rgba(15, 23, 42, 0.65) 100%);
 }
 
 .cms-hero-overlay.overlay-none {
-  background: transparent;
+  background: transparent !important;
+  display: none !important;
 }
 
 /* Hero Edit Hover Pill */
@@ -1332,6 +1401,44 @@ body.cms-edit-mode .wp-hero-edit-pill {
   background: #e2e8f0;
   border-color: #94a3b8;
   color: #0f172a;
+}
+
+/* Hero Media Studio - Sound Mode & Format Toggle Buttons */
+.wp-sound-mode-btn,
+.wp-media-type-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155 !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.wp-sound-mode-btn:hover,
+.wp-media-type-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a !important;
+}
+
+.wp-sound-mode-btn.active,
+.wp-media-type-btn.active {
+  background: var(--wp-primary, #2563eb) !important;
+  color: #ffffff !important;
+  border-color: var(--wp-primary, #2563eb) !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.wp-sound-mode-btn.active i,
+.wp-media-type-btn.active i {
+  color: #ffffff !important;
 }
 
 /* Card Media Video & Photo Palettes */
@@ -1869,3 +1976,238 @@ body.cms-canvas-drag-active * {
   margin-top: 2px;
 }
 
+/* ============================================================
+   Button & Attached Page Action Bar and Controls
+   ============================================================ */
+
+.wp-btn-action-bar {
+  position: fixed !important;
+  z-index: 10000060 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 9px !important;
+  padding: 5px 8px !important;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 12px !important;
+  animation: wpFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  white-space: nowrap !important;
+}
+
+.wp-btn-action-bar .wp-btn-act-tag {
+  color: #94a3b8 !important;
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  font-weight: 600 !important;
+  max-width: 140px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.wp-btn-action-bar button {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+  padding: 4px 9px !important;
+  border-radius: 6px !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  transition: all 0.15s ease !important;
+  font-family: inherit !important;
+}
+
+.wp-btn-action-bar button:hover {
+  background: var(--wp-primary, #2563eb) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+.wp-btn-action-bar button.danger:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.wp-hero-btn-add {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 9px 16px !important;
+  border-radius: 9999px !important;
+  border: 1.5px dashed rgba(212, 175, 55, 0.65) !important;
+  background: rgba(212, 175, 55, 0.1) !important;
+  color: #fbbf24 !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-family: 'Montserrat', sans-serif !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  vertical-align: middle !important;
+}
+
+.wp-hero-btn-add:hover {
+  background: rgba(212, 175, 55, 0.24) !important;
+  border-color: var(--gold, #d4af37) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.28) !important;
+}
+
+body:not(.cms-edit-mode) .wp-hero-btn-add,
+body:not(.cms-edit-mode) .wp-btn-action-bar {
+  display: none !important;
+}
+
+
+
+
+/* ==========================================================================
+   Individual Button Edit Badges (.wp-btn-edit-badge)
+   ========================================================================== */
+body.cms-edit-mode .btn,
+body.cms-edit-mode a.btn,
+body.cms-edit-mode button.btn,
+body.cms-edit-mode .hero-actions > a,
+body.cms-edit-mode .hero-actions > button,
+body.cms-edit-mode .cta-group > a {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.wp-btn-edit-badge {
+  position: absolute !important;
+  top: -12px !important;
+  right: -6px !important;
+  z-index: 9999 !important;
+  display: none;
+  align-items: center !important;
+  gap: 2px !important;
+  background: #090d16 !important;
+  border: 1.5px solid rgba(212, 175, 55, 0.85) !important;
+  border-radius: 9999px !important;
+  padding: 2px 5px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  line-height: 1 !important;
+  pointer-events: auto !important;
+  user-select: none !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+body.cms-edit-mode .wp-btn-edit-badge {
+  display: inline-flex !important;
+}
+
+.wp-btn-edit-badge:hover {
+  transform: translateY(-2px) scale(1.05) !important;
+  box-shadow: 0 6px 18px rgba(212, 175, 55, 0.45) !important;
+  border-color: #facc15 !important;
+}
+
+.wp-btn-badge-action {
+  background: transparent !important;
+  border: none !important;
+  color: #fbbf24 !important;
+  padding: 3px 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  border-radius: 5px !important;
+  transition: all 0.15s ease !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  font-family: inherit !important;
+}
+
+.wp-btn-badge-action:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+}
+
+.wp-btn-badge-action.wp-btn-badge-del {
+  color: #f87171 !important;
+  padding: 3px 5px !important;
+}
+
+.wp-btn-badge-action.wp-btn-badge-del:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+body:not(.cms-edit-mode) .wp-btn-edit-badge {
+  display: none !important;
+}
+
+/* ==========================================================================
+   Killed / Disabled Button State & Pill Indicators
+   ========================================================================== */
+[data-btn-killed="true"],
+.btn.btn-killed {
+  opacity: 0.52 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  filter: grayscale(0.65) contrast(0.9) !important;
+  border-style: dashed !important;
+  box-shadow: none !important;
+}
+
+body.cms-edit-mode [data-btn-killed="true"],
+body.cms-edit-mode .btn.btn-killed {
+  pointer-events: auto !important;
+  outline: 2px dashed #ef4444 !important;
+  outline-offset: 3px !important;
+}
+
+.wp-btn-killed-pill {
+  position: absolute !important;
+  bottom: -11px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  padding: 1px 7px !important;
+  border-radius: 9999px !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.5) !important;
+  pointer-events: none !important;
+  z-index: 999 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+body:not(.cms-edit-mode) .wp-btn-killed-pill {
+  display: none !important;
+}
+
+.wp-btn-badge-action.wp-btn-badge-kill {
+  color: #fb923c !important;
+  padding: 3px 5px !important;
+}
+
+.wp-btn-badge-action.wp-btn-badge-kill:hover {
+  background: rgba(251, 146, 60, 0.25) !important;
+  color: #ffedd5 !important;
+}
+
+.wp-btn-badge-action.wp-btn-badge-kill.is-killed {
+  color: #4ade80 !important;
+}
+
+.wp-btn-badge-action.wp-btn-badge-kill.is-killed:hover {
+  background: rgba(74, 222, 128, 0.25) !important;
+  color: #f0fdf4 !important;
+}
