@@ -5539,10 +5539,28 @@ ${mainContent}
 
           // Upload to local disk in uploads/ so it is permanently saved as a static file
           const uploadEndpoints = ['/api/upload-media', 'http://127.0.0.1:3456/api/upload-media'];
+          const knownMediaFiles = ['iimbg_campus_view.mp4', 'hero-video.mp4', 'gemini_generated_video_fef441c7.mp4', 'ECell Sign mail 2026 (2).mp4'];
+          const matchedKnown = knownMediaFiles.find(k => k.toLowerCase() === file.name.toLowerCase());
+
           const tryUpload = (endpointIdx) => {
             if (endpointIdx >= uploadEndpoints.length) {
-              if (urlInput && urlInput.value.startsWith('[Uploading')) {
-                urlInput.value = temp.src.startsWith('data:') ? `[Local File: ${file.name}]` : temp.src;
+              if (matchedKnown) {
+                temp.src = matchedKnown;
+                if (urlInput) urlInput.value = matchedKnown;
+                applyHeroMedia(heroEl, temp);
+                showToast(`Using pre-deployed media file "${matchedKnown}"!`, 'success');
+                return;
+              }
+              const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+              if (!isLocal) {
+                if (urlInput && urlInput.value.startsWith('[Uploading')) {
+                  urlInput.value = temp.src.startsWith('data:') ? `[Local: ${file.name}]` : temp.src;
+                }
+                showToast('Cloudflare Workers is serverless/read-only. For live hosting, please enter a public Video URL (e.g. Supabase Storage, CDN, or a pre-deployed file name like "iimbg_campus_view.mp4").', 'warning', 6000);
+              } else {
+                if (urlInput && urlInput.value.startsWith('[Uploading')) {
+                  urlInput.value = temp.src.startsWith('data:') ? `[Local File: ${file.name}]` : temp.src;
+                }
               }
               return;
             }
