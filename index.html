@@ -94,7 +94,7 @@ body { background-color: #f8fafc !important; }
 
         <h1 data-cms-id="txt_index_1">
           <span class="sub">Build the</span>
-          <span class="animated-word">NEXT BIG IDEA</span>
+          <span class="animated-word" data-pairs="Build the: NEXT BIG IDEA | Empower the: FUTURE FOUNDERS | Launch the: BOLD STARTUPS | Drive the: REAL IMPACT | Ignite the: STARTUP REVOLUTION">NEXT BIG IDEA</span>
         </h1>
 
         <p data-cms-id="txt_index_2" class="hero-copy">
@@ -880,6 +880,31 @@ body { background-color: #f8fafc !important; }
 
 <script src="supabase-config.js"></script>
   <script src="cms.js"></script>
-
-
+  <script>
+    (function () {
+      function ensureRotating() {
+        var word = document.querySelector('.hero .animated-word, .page-hero .animated-word, .animated-word');
+        if (!word) return;
+        var h1 = word.closest('h1, [data-cms-id="txt_index_1"]');
+        if (h1 && !word.getAttribute('data-pairs')) {
+          word.setAttribute('data-pairs', 'Build the: NEXT BIG IDEA | Empower the: FUTURE FOUNDERS | Launch the: BOLD STARTUPS | Drive the: REAL IMPACT | Ignite the: STARTUP REVOLUTION');
+        }
+        if (typeof window.initRotatingWords === 'function') {
+          window.initRotatingWords(document);
+        }
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ensureRotating);
+      } else {
+        ensureRotating();
+      }
+      window.addEventListener('load', ensureRotating);
+      window.addEventListener('supabaseReady', function () {
+        setTimeout(ensureRotating, 200);
+        setTimeout(ensureRotating, 800);
+      });
+      setTimeout(ensureRotating, 400);
+      setTimeout(ensureRotating, 1200);
+    })();
+  </script>
 </body></html>

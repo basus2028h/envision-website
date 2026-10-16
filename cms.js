@@ -138,6 +138,9 @@
     clone.querySelectorAll('.cms-dragging, .cms-drop-target-before, .cms-drop-target-after, .cms-move-active').forEach((node) => {
       node.classList.remove('cms-dragging', 'cms-drop-target-before', 'cms-drop-target-after', 'cms-move-active');
     });
+    clone.querySelectorAll('.fade').forEach((node) => {
+      node.classList.remove('fade');
+    });
     return clone.innerHTML;
   }
 
@@ -346,6 +349,25 @@
     return map;
   }
 
+  function sanitizeIndexContentMap(map) {
+    if (!map || typeof map !== 'object' || (pagePath !== 'index.html' && pagePath !== '')) return map;
+    if (map.txt_index_1 && typeof map.txt_index_1.html === 'string') {
+      const h = map.txt_index_1.html;
+      if (!h.includes('data-pairs')) {
+        map.txt_index_1.html = '<span class="sub">Build the</span>\n<span class="animated-word" data-pairs="Build the: NEXT BIG IDEA | Empower the: FUTURE FOUNDERS | Launch the: BOLD STARTUPS | Drive the: REAL IMPACT | Ignite the: STARTUP REVOLUTION">NEXT BIG IDEA</span>';
+      }
+    }
+    return map;
+  }
+
+  function normalizeIndexRow(row) {
+    if (!row || (pagePath !== 'index.html' && pagePath !== '')) return row;
+    if (row.content_data) {
+      row.content_data = sanitizeIndexContentMap(row.content_data);
+    }
+    return row;
+  }
+
   function normalizeEventsRow(row) {
     if (!row || pagePath !== 'events.html') return row;
     const content = row.content_data;
@@ -435,6 +457,7 @@
         // Only let remote Supabase overwrite if there are NO local edits, or if remote is strictly newer than our local save timestamp
         if (!hasLocalEdits || (localSavedAt && remoteSavedAt > localSavedAt)) {
           data = normalizeEventsRow(data);
+          data = normalizeIndexRow(data);
           if (data.grid_data && Object.keys(data.grid_data).length > 0) {
             if (pagePath === 'events.html') delete data.grid_data.grid_events_1;
             Object.keys(data.grid_data).forEach((gridId) => {
@@ -450,7 +473,9 @@
 
           if (data.content_data && Object.keys(data.content_data).length > 0) {
             data.content_data = sanitizeEventsContentMap(data.content_data);
+            data.content_data = sanitizeIndexContentMap(data.content_data);
             pageContentMap = sanitizeEventsContentMap({ ...pageContentMap, ...data.content_data });
+            pageContentMap = sanitizeIndexContentMap(pageContentMap);
             applyPageContent(pageContentMap);
             try { localStorage.setItem(pageStorageKey, JSON.stringify(pageContentMap)); } catch (e) { }
           }
@@ -499,6 +524,7 @@
       if (stored) {
         pageContentMap = JSON.parse(stored);
         pageContentMap = sanitizeEventsContentMap(pageContentMap);
+        pageContentMap = sanitizeIndexContentMap(pageContentMap);
         applyPageContent(pageContentMap);
       }
 
@@ -535,6 +561,9 @@
     });
 
     cleanupConflictedCardMedia();
+    if (typeof window.initRotatingWords === 'function') {
+      window.initRotatingWords(document);
+    }
   }
 
   const CANONICAL_PAGES = [
@@ -1683,8 +1712,8 @@
 
           <!-- Button Function Status & Kill Control -->
           ${(() => {
-            const isKilled = targetBtn.getAttribute('data-btn-killed') === 'true';
-            return `
+        const isKilled = targetBtn.getAttribute('data-btn-killed') === 'true';
+        return `
             <div class="wp-panel-group" style="margin-bottom: 14px; background: ${isKilled ? '#fef2f2' : '#f0fdf4'}; padding: 12px; border-radius: 8px; border: 1px solid ${isKilled ? '#fecaca' : '#bbf7d0'};">
               <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div>
@@ -1701,7 +1730,7 @@
               </div>
             </div>
             `;
-          })()}
+      })()}
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
             <div>
@@ -5508,7 +5537,7 @@ ${mainContent}
           vid.muted = false;
           const p = vid.play();
           if (p !== undefined) {
-            p.catch(() => {});
+            p.catch(() => { });
           }
         }
       }
@@ -5569,20 +5598,20 @@ ${mainContent}
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ filename: file.name, data: rawData })
             })
-            .then(res => res.json())
-            .then(data => {
-              if (data && data.url) {
-                temp.src = data.url;
-                if (urlInput) urlInput.value = data.url;
-                applyHeroMedia(heroEl, temp);
-                console.log('[CMS] Hero media uploaded successfully to:', data.url);
-              } else {
+              .then(res => res.json())
+              .then(data => {
+                if (data && data.url) {
+                  temp.src = data.url;
+                  if (urlInput) urlInput.value = data.url;
+                  applyHeroMedia(heroEl, temp);
+                  console.log('[CMS] Hero media uploaded successfully to:', data.url);
+                } else {
+                  tryUpload(endpointIdx + 1);
+                }
+              })
+              .catch(() => {
                 tryUpload(endpointIdx + 1);
-              }
-            })
-            .catch(() => {
-              tryUpload(endpointIdx + 1);
-            });
+              });
           };
           tryUpload(0);
         };
@@ -5626,7 +5655,7 @@ ${mainContent}
           if (typeof markDirty === 'function') {
             markDirty();
           }
-        } catch (dirtyErr) {}
+        } catch (dirtyErr) { }
 
         backdrop.remove();
         showToast('Hero Photo/Video & Coverage settings updated!', 'success');
@@ -6282,8 +6311,8 @@ ${mainContent}
         }
         const urlParams = new URLSearchParams(window.location.search);
         const shouldEdit = urlParams.get('edit') === '1' ||
-                           urlParams.get('cms') === '1' ||
-                           sessionStorage.getItem('envision_cms_edit_mode') === 'true';
+          urlParams.get('cms') === '1' ||
+          sessionStorage.getItem('envision_cms_edit_mode') === 'true';
         if (shouldEdit && !isEditMode) {
           setEditMode(true);
         }
@@ -6428,6 +6457,9 @@ ${mainContent}
             html: sanitizeHtml(getCleanElementHtml(el)),
             style: elStyle
           };
+          if (id === 'txt_index_1' && typeof itemObj.html === 'string' && !itemObj.html.includes('data-pairs')) {
+            itemObj.html = '<span class="sub">Build the</span>\n<span class="animated-word" data-pairs="Build the: NEXT BIG IDEA | Empower the: FUTURE FOUNDERS | Launch the: BOLD STARTUPS | Drive the: REAL IMPACT | Ignite the: STARTUP REVOLUTION">NEXT BIG IDEA</span>';
+          }
           if (el.tagName === 'A' || el.hasAttribute('href')) {
             itemObj.href = el.getAttribute('href') || '';
             if (el.getAttribute('target')) itemObj.target = el.getAttribute('target');

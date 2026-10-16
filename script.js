@@ -265,8 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     containers.forEach(function (word) {
       if (rotatingWordTimers.has(word)) {
-        clearInterval(rotatingWordTimers.get(word));
-        rotatingWordTimers.delete(word);
+        return;
       }
 
       var heading = word.closest('h1, h2, h3, .hero-content');
@@ -296,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           return { sub: sub ? sub.textContent.trim() : '', word: p };
         });
-      } else if (sub) {
+      } else if (sub || (heading && heading.getAttribute('data-cms-id') === 'txt_index_1')) {
         pairs = defaultHeroPairs;
       } else {
         pairs = [
@@ -320,24 +319,36 @@ document.addEventListener('DOMContentLoaded', () => {
       if (index === -1) index = 0;
 
       var timerId = setInterval(function () {
-        if (document.body.classList.contains('cms-edit-mode')) return;
+        // If element is removed from DOM, cancel timer to avoid orphaned leak
+        if (!document.contains(word)) {
+          clearInterval(timerId);
+          rotatingWordTimers.delete(word);
+          return;
+        }
+
+        var currentHeading = word.closest('h1, h2, h3, .hero-content');
+        var currentSub = currentHeading ? currentHeading.querySelector('.sub') : sub;
+
+        // Pause animation only when editor is actively typing in the heading
+        if (word.isContentEditable && (document.activeElement === word || (currentHeading && currentHeading.contains(document.activeElement)))) return;
 
         word.classList.add('fade');
-        if (sub) sub.classList.add('fade');
+        if (currentSub) currentSub.classList.add('fade');
 
         setTimeout(function () {
+          if (!document.contains(word)) return;
           index = (index + 1) % pairs.length;
           var nextPair = pairs[index];
 
           word.textContent = nextPair.word;
-          if (sub && nextPair.sub) {
-            sub.textContent = nextPair.sub;
+          if (currentSub && nextPair.sub) {
+            currentSub.textContent = nextPair.sub;
           }
 
           word.classList.remove('fade');
-          if (sub) sub.classList.remove('fade');
+          if (currentSub) currentSub.classList.remove('fade');
         }, 280);
-      }, 2600);
+      }, 2400);
 
       rotatingWordTimers.set(word, timerId);
     });
@@ -561,7 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (e.pointerId !== undefined && e.target.setPointerCapture) {
                   e.target.setPointerCapture(e.pointerId);
                 }
-              } catch (_) {}
+              } catch (_) { }
             }
           } else {
             return; // within initial deadband
@@ -600,7 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (e.pointerId !== undefined && e.target.releasePointerCapture) {
             e.target.releasePointerCapture(e.pointerId);
           }
-        } catch (_) {}
+        } catch (_) { }
 
         if (isDragging) {
           row.classList.remove('is-dragging');
@@ -1075,7 +1086,7 @@ function initMediaPlaceholders() {
         p.catch(function () {
           video.muted = true;
           video.setAttribute('muted', '');
-          video.play().catch(function () {});
+          video.play().catch(function () { });
         });
       }
       return;
@@ -1117,6 +1128,7 @@ function initMediaPlaceholders() {
 
   if (window.MutationObserver) {
     var observer = new MutationObserver(function (mutations) {
+      var needsWordInit = false;
       mutations.forEach(function (m) {
         if (m.type === 'childList') {
           m.addedNodes.forEach(function (node) {
@@ -1127,6 +1139,11 @@ function initMediaPlaceholders() {
                 node.querySelectorAll('img').forEach(setupImage);
                 node.querySelectorAll('video').forEach(setupVideo);
               }
+              if (node.classList && node.classList.contains('animated-word')) {
+                needsWordInit = true;
+              } else if (node.querySelector && node.querySelector('.animated-word')) {
+                needsWordInit = true;
+              }
             }
           });
         } else if (m.type === 'attributes' && m.attributeName === 'src') {
@@ -1134,6 +1151,9 @@ function initMediaPlaceholders() {
           else if (m.target.tagName === 'VIDEO') setupVideo(m.target);
         }
       });
+      if (needsWordInit && typeof window.initRotatingWords === 'function') {
+        window.initRotatingWords(document);
+      }
     });
 
     if (document.body) {
@@ -1427,9 +1447,22 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
     return row;
   }
 
+  function normalizeIndexRow(row) {
+    if (!row || (pagePath !== 'index.html' && pagePath !== '')) return row;
+    var content = row.content_data;
+    if (content && content.txt_index_1 && typeof content.txt_index_1.html === 'string') {
+      var h = content.txt_index_1.html;
+      if (!h.includes('data-pairs')) {
+        content.txt_index_1.html = '<span class="sub">Build the</span>\n<span class="animated-word" data-pairs="Build the: NEXT BIG IDEA | Empower the: FUTURE FOUNDERS | Launch the: BOLD STARTUPS | Drive the: REAL IMPACT | Ignite the: STARTUP REVOLUTION">NEXT BIG IDEA</span>';
+      }
+    }
+    return row;
+  }
+
   function apply(row) {
     if (!row) return;
     row = normalizeEventsRow(row);
+    row = normalizeIndexRow(row);
 
     // 1. Card grids (added / removed / reordered cards)
     var grids = row.grid_data;
@@ -1714,6 +1747,9 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
         } catch (e) { }
       }
       apply(localRow);
+      if (pagePath === 'index.html' && localRow.content_data && localRow.content_data.txt_index_1) {
+        try { localStorage.setItem('envision_cms_content_' + pagePath, JSON.stringify(localRow.content_data)); } catch (e) { }
+      }
     }
     removeHeroAudioButtons();
   } catch (e) { }

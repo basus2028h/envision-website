@@ -425,6 +425,8 @@ body.theme-dark .nav-slider-btn:hover:not(:disabled) {
   font-size: clamp(3.2rem, 9vw, 10rem);
   margin: 0;
   text-transform: uppercase;
+  color: #111827;
+  text-shadow: none !important;
 }
 
 .hero h1 .sub,
@@ -432,6 +434,8 @@ body.theme-dark .nav-slider-btn:hover:not(:disabled) {
 .sub {
   display: block;
   margin-top: 0.2rem;
+  color: #111827;
+  text-shadow: none !important;
   transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, opacity;
 }
@@ -460,7 +464,10 @@ body.theme-dark .nav-slider-btn:hover:not(:disabled) {
   background: linear-gradient(90deg, #946200, #d5a535, #946200);
   -webkit-background-clip: text;
   background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
+  text-shadow: none !important;
+  filter: none !important;
 }
 
 .hero-copy {
@@ -891,13 +898,13 @@ body.theme-dark .nav-slider-btn:hover:not(:disabled) {
 
 .page-hero-inspire h1 {
   color: #111827;
-  text-shadow: 0 2px 8px rgba(255, 255, 255, 0.65);
+  text-shadow: none !important;
 }
 
 .page-hero-inspire p {
   color: #172334;
   font-weight: 600;
-  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9), 0 0 10px rgba(255, 255, 255, 0.55);
+  text-shadow: none;
 }
 
 .page-hero h1 {
@@ -1353,7 +1360,7 @@ body::before {
 .hero h1,
 .hero h2 {
   color: #111827;
-  text-shadow: 0 2px 8px rgba(255, 255, 255, 0.7);
+  text-shadow: none !important;
 }
 
 .hero h1 .animated-word,
@@ -1364,24 +1371,25 @@ body::before {
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  text-shadow: none;
+  text-shadow: none !important;
+  filter: none !important;
 }
 
 .hero-copy {
   color: #172334;
   font-weight: 600;
-  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9), 0 0 10px rgba(255, 255, 255, 0.6);
+  text-shadow: none;
 }
 
 .page-hero h1 {
   color: #111827;
-  text-shadow: 0 2px 8px rgba(255, 255, 255, 0.55);
+  text-shadow: none !important;
 }
 
 .page-hero p {
   color: #172334;
   font-weight: 600;
-  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
+  text-shadow: none;
 }
 
 .btn-primary {
@@ -3866,12 +3874,7 @@ body.events-page .events-format-section .card-body p {
 }
 
 .cms-hero-overlay.overlay-vignette {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.15) 0%, rgba(15, 23, 42, 0.45) 100%);
-}
-
-[data-theme="dark"] .cms-hero-overlay.overlay-vignette,
-.dark .cms-hero-overlay.overlay-vignette {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.8) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.1) 40%, rgba(15, 23, 42, 0.35) 100%);
 }
 
 .cms-hero-overlay.overlay-navy {
@@ -3898,4 +3901,4 @@ body.events-page .events-format-section .card-body p {
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
-}
+}
