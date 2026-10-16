@@ -414,19 +414,22 @@ body.theme-dark .nav-slider-btn:hover:not(:disabled) {
   width: 64px;
   height: 1px;
   background: rgba(212, 175, 55, 0.8);
+  pointer-events: none;
+  user-select: none;
 }
 
 .hero h1,
 .hero h2 {
   font-family: 'Montserrat', sans-serif;
   font-weight: 900;
-  line-height: 0.9;
+  line-height: 0.92;
   letter-spacing: -0.06em;
-  font-size: clamp(3.2rem, 9vw, 10rem);
+  font-size: clamp(3rem, 8vw, 8.5rem);
   margin: 0;
   text-transform: uppercase;
   color: #111827;
   text-shadow: none !important;
+  min-height: 3.15em;
 }
 
 .hero h1 .sub,
@@ -438,6 +441,7 @@ body.theme-dark .nav-slider-btn:hover:not(:disabled) {
   text-shadow: none !important;
   transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, opacity;
+  min-height: 1.05em;
 }
 
 .sub.fade {
@@ -451,6 +455,13 @@ body.theme-dark .nav-slider-btn:hover:not(:disabled) {
   transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, opacity;
   vertical-align: baseline;
+}
+
+.hero h1 .animated-word,
+.hero h2 .animated-word {
+  min-height: 2.1em;
+  display: inline-block;
+  vertical-align: top;
 }
 
 .animated-word.fade {
@@ -478,6 +489,7 @@ body.theme-dark .nav-slider-btn:hover:not(:disabled) {
   color: rgba(226, 232, 240, 0.8);
   font-size: clamp(1.05rem, 2vw, 1.5rem);
   line-height: 1.6;
+  min-height: 3.4em;
 }
 
 .hero-actions {
@@ -1145,12 +1157,27 @@ footer {
     letter-spacing: 0.12em;
   }
 
+  .hero h1,
+  .hero h2 {
+    font-size: clamp(2.4rem, 11vw, 3.8rem);
+    line-height: 0.98;
+    min-height: 3.3em;
+  }
+
+  .hero h1 .animated-word,
+  .hero h2 .animated-word {
+    min-height: 2.25em;
+  }
+
   .hero-copy {
     padding-left: 0.8rem;
+    min-height: 4.6em;
+    margin-top: 1.5rem;
   }
 
   .hero-actions {
     flex-direction: column;
+    margin-top: 1.8rem;
   }
 
   .btn {
@@ -2673,6 +2700,12 @@ body.theme-inspire-geist .error-quick-link:hover {
   line-height: 1.08;
   margin: 0 0 1rem;
   color: var(--text);
+  min-height: 2.25em;
+}
+
+.event-hero-title .animated-word {
+  min-height: 1.15em;
+  display: inline-block;
 }
 
 .ted-red {
@@ -2687,6 +2720,7 @@ body.theme-inspire-geist .error-quick-link:hover {
   line-height: 1.7;
   margin: 0 0 2.2rem;
   font-weight: 400;
+  min-height: 3.5em;
 }
 
 .event-hero-actions {
@@ -3901,4 +3935,11 @@ body.events-page .events-format-section .card-body p {
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
+}
+
+/* Card Video Floating Sound Mute / Unmute Button - Hidden per user requirements (videos muted by default) */
+.card-sound-btn {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
